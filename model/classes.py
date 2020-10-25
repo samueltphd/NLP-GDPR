@@ -64,7 +64,6 @@ class User:
             self.aggregator.remove_user_from_rounds(self.uid, participated_rounds)
         
 
-
     def train(self, t_round):
         """
         function to ask the user to train based on their local data
@@ -89,6 +88,18 @@ class User:
         self.logger.log_round_participated(uid, rid, output)
         # return the data so the aggregator can get it
         return output
+
+    
+    def update_weights(self, prev_rid, new_rid, update_func):
+        try:
+            assert prev_rid in self.rid_to_local_weight
+            old_weight = self.rid_to_local_weight[prev_rid]
+            new_weight = update_func(old_weight)
+            self.associate_local_weight_with_rid(new_rid, new_weight)
+        except Exception as e:
+            print(e)
+            return False
+        return True
 
 
 
@@ -118,7 +129,6 @@ class Round:
         #       + a dict that maps from uid (int) to the weight changes function to be happened (that takes in
         #           the current set of weights from the user, and update it to be something)
         #           +-+-+ weight function: a function that takes in a previous set of weights and output a novel set of weights
-        ##### TODO: is there a need to keep track of rid -> local weights on the user side, or just one current_weights is enough?
         self.aggregation_function = aggregation_function
 
 
@@ -184,16 +194,12 @@ class Aggregator:
                 for uid_to_locally_update in uid_to_local_weights:
                     update_function = uid_to_local_weights[uid_to_locally_update]
                     user_to_update = self.logger.get_user(uid_to_locally_update)
-                    # TODO: This function might look different if we are storing the set of weights as we go
-                    # old weights:
-                    old_local_weight = user_to_update.get_weight_from_rid(rid-1)
-                    # new weights:
-                    new_weight = update_function(old_local_weight)
-                    # store it
-                    user_to_update.associate_local_weight_with_rid(rid, new_weight)
+                    # tell the user to update with this update function
+                    self.user_to_update.update_weights(rid-1, rid, update_function)
             except Exception as e:
                 # This is potentially where the weaker and harder forms of compliance would happen --
                 # return False if fails to delete, vs. continue and just skipping for those that are too hard
+                print("Exception caught: ", e)
                 if compliance_mode == STRICT: return False
                 continue
         return True
@@ -247,12 +253,8 @@ class Aggregator:
                         # update_function: function that would take in a previous set of weights and output a new set of weights
                         # should handle input=None (in case this is the first training round)
                         update_function = uid_to_local_weight_fs[uid_to_locally_update]
-                        # old weights:
-                        old_local_weight = user.get_weight_from_rid(rid-1)
-                        # new weights:
-                        new_weight = update_function(old_local_weight)
-                        # store it
-                        user.associate_local_weight_with_rid(rid, new_weight)
+                        # tell the user to update with this update function
+                        self.user.update_weights(rid-1, rid, update_function)
             except Exception as e:
                 if compliance_mode == STRICT: return False
                 continue
@@ -290,14 +292,11 @@ class Aggregator:
                 # update_function: function that would take in a previous set of weights and output a new set of weights
                 # should handle input=None (in case this is the first training round)
                 update_function = uid_to_local_weight_fs[uid_to_locally_update]
-                # old weights:
-                old_local_weight = user.get_weight_from_rid(rid-1)
-                # new weights:
-                new_weight = update_function(old_local_weight)
-                # store it
-                user.associate_local_weight_with_rid(rid, new_weight)
+                # tell the user to update with this update function
+                self.user.update_weights(rid-1, rid, update_function)
             return True
         except Exception as e:
+            print("Exception caught: ", e)
             return False
             
             
