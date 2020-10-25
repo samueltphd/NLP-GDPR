@@ -40,8 +40,8 @@ class User:
         """ function to request the aggregator to update the user's participation in the rid round of training """
         assert rid in self.logger.get_rids_from_uid(self.uid)
         self.aggregator.update_user_participation_in_round(self.uid, rid)
-    
-    
+
+
     def remove_self_from_round(self, rid):
         """
         function to request the aggregator to remove them from a round of training
@@ -57,7 +57,7 @@ class User:
         participated_rounds = self.logger.get_rids_from_uid(self.uid)
         if participated_rounds != None:
             self.aggregator.remove_user_from_rounds(self.uid, participated_rounds)
-        
+
 
 
     def train(self, t_round):
@@ -75,7 +75,7 @@ class User:
         training_data = data_f(self.data)
         # getting the weights from the training function
         output = train_f(training_data)
-        # ask the logger to log the round id 
+        # ask the logger to log the round id
         self.logger.log_round_participated(uid, rid, output)
         # return the data so the aggregator can get it
         return output
@@ -102,7 +102,7 @@ class Round:
         #       + dict of weights from all the different devices. format:
         #               uid (int): weight (list-like)
         #       + a previous global set of weights (list-like)
-        #       
+        #
         # - output:
         #       + the result of aggregation, probably the checkpoint
         #       + a dict that maps from uid (int) to the weight changes function to be happened (that takes in
@@ -215,7 +215,7 @@ class Aggregator:
                 return False
         return True
 
-    
+
     def basic_train(self, t_round, num_participants):
         """
         function to do the server's training algorithm as demonstrated in the paper. The list of things that it will do:
@@ -252,9 +252,9 @@ class Aggregator:
             new_weight = update_function(old_local_weight)
             # store it
             user.associate_local_weight_with_rid(rid, new_weight)
-            
-            
-        
+
+
+
 
 
 
@@ -286,7 +286,7 @@ class Log:
 
     ##################### FUNCTIONS TO USE AFTER WEIGHTS UPDATES ARE MADE #######################
     # DONE
-    def log_round_participated(self, uid, rid, weights): 
+    def log_round_participated(self, uid, rid, weights):
         """
         function to update the log to note that uid participated in rid
         input: uid (int), rid (int)
@@ -309,9 +309,9 @@ class Log:
         self.uid_to_rids[uid].remove(rid)
         self.rid_to_uids[rid].remove(uid)
         del self.uid_rid_to_weights[(uid, rid)]
-    
 
-    #################################### GETTERS AND SETTERS ####################################        
+
+    #################################### GETTERS AND SETTERS ####################################
     # DONE
     def add_round(self, rid, t_round):
         if rid in self.rid_to_round: raise Exception("rid already added")
@@ -360,7 +360,7 @@ class Log:
         self.rid_to_global_checkpoints[rid] = value
         return value
 
-    
+
     # DONE
     def get_global_checkpoint(self, rid):
         if rid not in self.rid_to_global_checkpoints: return None
@@ -371,8 +371,8 @@ class Log:
     def get_weight_contributed_by_device(self, uid, rid):
         if (uid, rid) not in self.uid_rid_to_weights: return None
         return self.uid_rid_to_weights[(uid, rid)]
-        
-    
+
+
     def sample_users(num_selecting_users):
         # return a {uid (int): user (User)} dict
         random_ids = random.sample(self.uid_to_user.keys(), num_selecting_users)
