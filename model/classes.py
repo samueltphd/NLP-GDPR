@@ -15,9 +15,14 @@ class User:
         self.rid_to_local_weight = {}
 
 
-    def update_data(self, update_func):
+    def update_data(self, update_func, type_check=False):
         """ Function to update the existing data. Allows for flexibility for different applications to update user's data """
         self.data = update_func(self.data)
+        if not type_check: return
+        for ele in self.data:
+            assert type(ele) == dict
+            assert "uid" in ele
+            if "rids" not in ele: ele["rids"] = []
 
 
     def associate_local_weight_with_rid(self, rid, new_weight, replace=False):
@@ -73,6 +78,11 @@ class User:
         train_f, data_f, rid = t_round.get_training_function(), t_round.get_data_function(), t_round.get_round_id()
         # getting the data to be trained
         training_data = data_f(self.data)
+        # this part is to update the training_data that it has already participated in t_round
+        for ele in training_data:
+            assert type(ele) == dict
+            if "rids" not in ele: ele["rids"] = []
+            ele["rids"].append(rid)
         # getting the weights from the training function
         output = train_f(training_data)
         # ask the logger to log the round id 
@@ -132,6 +142,7 @@ class Round:
 class Aggregator:
     def __init__(self, logger, compliance_mode=VERY_WEAK):
         self.logger = logger
+        self.compliance_mode = compliance_mode
         pass
 
 
@@ -174,11 +185,17 @@ class Aggregator:
                     update_function = uid_to_local_weights[uid_to_locally_update]
                     user_to_update = self.logger.get_user(uid_to_locally_update)
                     # TODO: This function might look different if we are storing the set of weights as we go
-                    # user_to_update.update_current_weights(update_function)
+                    # old weights:
+                    old_local_weight = user_to_update.get_weight_from_rid(rid-1)
+                    # new weights:
+                    new_weight = update_function(old_local_weight)
+                    # store it
+                    user_to_update.associate_local_weight_with_rid(rid, new_weight)
             except Exception as e:
                 # This is potentially where the weaker and harder forms of compliance would happen --
                 # return False if fails to delete, vs. continue and just skipping for those that are too hard
-                return False
+                if compliance_mode == STRICT: return False
+                continue
         return True
 
 
@@ -205,14 +222,40 @@ class Aggregator:
                 # get the output from training
                 output = user.train(t_round)
                 # get the weight contributed by this uid to this rid in the past
-                old_weight = self.get_weight_contributed_by_device(uid, rid)
+                old_weight = self.logger.get_weight_contributed_by_device(uid, rid)
                 # compare // TODO: Does this method of comparison work lmao and what should we use the type of output/old_weight
                 if output == old_weight: continue
                 else:
-                    # in this case we would get the aggregator, and train over again
-                    pass
+                    # in this case we would get the aggregation function, and train over again
+                    aggregation_f = t_round.get_aggregation_function()
+                    previous_global_checkpoint = self.logger.get_global_checkpoint(rid-1)
+                    # construct a new set of weights returned for this round
+                    new_weights_returned = {}
+                    new_weights_returned[uid] = output
+                    uids = self.logger.get_uids_from_rid(rid)
+                    for other_uid in uids:
+                        if other_uid != uid:
+                            new_weights_returned[other_uid] = self.logger.get_weight_contributed_by_device(other_uid, rid)
+                    # use the aggregation function to get the global weights and to get the updates on each user's device
+                    global_weights, uid_to_local_weight_fs = aggregation_f(weights=new_weights_returned, prev_weight=previous_global_checkpoint)
+                    # replace with what we currently have
+                    self.logger.set_global_checkpoint(rid, global_weights, replace=True)
+                    # ask each user to update the weights
+                    for uid_to_locally_update in uid_to_local_weight_fs:
+                        # user:
+                        user = self.logger.get_user(uid_to_locally_update)
+                        # update_function: function that would take in a previous set of weights and output a new set of weights
+                        # should handle input=None (in case this is the first training round)
+                        update_function = uid_to_local_weight_fs[uid_to_locally_update]
+                        # old weights:
+                        old_local_weight = user.get_weight_from_rid(rid-1)
+                        # new weights:
+                        new_weight = update_function(old_local_weight)
+                        # store it
+                        user.associate_local_weight_with_rid(rid, new_weight)
             except Exception as e:
-                return False
+                if compliance_mode == STRICT: return False
+                continue
         return True
 
     
@@ -223,35 +266,39 @@ class Aggregator:
         - For each of these, call the train() function on each user's device
         """
         # get the training function and the data selection function for each user
-        train_f, data_f, rid = t_round.get_training_function(), t_round.get_data_function(),t_round.get_round_id()
-        selected_users = self.logger.sample_users(num_participants)
-        weights_returned = {}
-        for uid in selected_users:
-            user = self.logger.get_user(uid)
-            # tell that user to train and give back the weights
-            output = user.train(t_round) # this should already log their weight contribution
-            # update to the weights_returned
-            weights_returned[uid] = output
-        # get the aggregator and the last checkpoint
-        previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
-        aggregation_f = t_round.get_aggregation_function()
-        # call aggregation_f to get the global weight updates and the weight updates function to send back to devices
-        global_weight_updates, uid_to_local_weight_fs = aggregation_f(weights=weights_returned, prev_weight=previous_global_checkpoint)
-        # set the global checkpoint (so the weights, not the updates)
-        self.logger.set_global_checkpoint(rid, rid, global_weight_updates)
-        # ask users to update the weights
-        for uid_to_locally_update in uid_to_local_weight_fs:
-            # user:
-            user = self.logger.get_user(uid)
-            # update_function: function that would take in a previous set of weights and output a new set of weights
-            # should handle input=None (in case this is the first training round)
-            update_function = uid_to_local_weight_fs[uid_to_locally_update]
-            # old weights:
-            old_local_weight = user.get_weight_from_rid(rid-1)
-            # new weights:
-            new_weight = update_function(old_local_weight)
-            # store it
-            user.associate_local_weight_with_rid(rid, new_weight)
+        try:
+            train_f, data_f, rid = t_round.get_training_function(), t_round.get_data_function(),t_round.get_round_id()
+            selected_users = self.logger.sample_users(num_participants)
+            weights_returned = {}
+            for uid in selected_users:
+                user = self.logger.get_user(uid)
+                # tell that user to train and give back the weights
+                output = user.train(t_round) # this should already log their weight contribution
+                # update to the weights_returned
+                weights_returned[uid] = output
+            # get the aggregator and the last checkpoint
+            previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
+            aggregation_f = t_round.get_aggregation_function()
+            # call aggregation_f to get the global weight updates and the weight updates function to send back to devices
+            global_weights, uid_to_local_weight_fs = aggregation_f(weights=weights_returned, prev_weight=previous_global_checkpoint)
+            # set the global checkpoint (so the weights, not the updates)
+            self.logger.set_global_checkpoint(rid, rid, global_weights)
+            # ask users to update the weights
+            for uid_to_locally_update in uid_to_local_weight_fs:
+                # user:
+                user = self.logger.get_user(uid_to_locally_update)
+                # update_function: function that would take in a previous set of weights and output a new set of weights
+                # should handle input=None (in case this is the first training round)
+                update_function = uid_to_local_weight_fs[uid_to_locally_update]
+                # old weights:
+                old_local_weight = user.get_weight_from_rid(rid-1)
+                # new weights:
+                new_weight = update_function(old_local_weight)
+                # store it
+                user.associate_local_weight_with_rid(rid, new_weight)
+            return True
+        except Exception as e:
+            return False
             
             
         
