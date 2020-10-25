@@ -1,19 +1,20 @@
-import threading.Lock as Lock
+from threading import Lock
 
 class PCQueue:
     def __init__(self):
-        q = []
-        l = Lock()
+        self.q = []
+        self.l = Lock()
 
     def deque(self):
-        l.acquire()
-        if len(q) > 0:
-            return l.pop(0)
+        self.l.acquire()
+        if len(self.q) > 0:
+            self.l.release()
+            return self.l.pop(0)
         else:
+            self.l.release()
             return None
-        l.release()
 
     def enque(self, item):
-        l.acquire()
-        q.append(item)
-        l.release()
+        self.l.acquire()
+        self.q.append(item)
+        self.l.release()

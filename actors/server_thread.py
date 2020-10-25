@@ -1,12 +1,14 @@
+from model.classes import Round
+
 import random
 import time
 
 TRAIN_TIME = 1
 
-def tfunc():
+def dfunc():
     pass
 
-def dfunc():
+def afunc():
     pass
 
 def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_qs, delete_qs, train_pct=10, mode=0):
@@ -17,7 +19,8 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
     """
     global TRAIN_TIME
 
-    start = time.now()
+    start = time.time()
+    print("Starting server thread at: " + str(start))
 
     # set up log information
     log.rounds                    = {}
@@ -31,7 +34,8 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
     log.next_rid                  = 1
 
     rid = 0
-    while time.now() - start < _tlength:
+    while time.time() - start < _tlength:
+        print(time.time() - start)
         # determine number of users to participate in the next round
         r = random.randrange(1, len(users) + 1)
 
@@ -52,9 +56,10 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
         participants = random.sample(users, r)
         pids = [users.index(p) for p in participants]
 
+        print("Sending training requests...")
         # send training request to participants
         for pid, p in zip(pids, participants):
-            train_q[pid].enque(round.training_function)
+            train_qs[pid].enque(round.training_function)
 
             if pid in log.uid_to_rids.keys():
                 log.uid_to_rids[pid].append(rid)
@@ -62,7 +67,7 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
                 log.uid_to_rids[pid] = [rid]
 
         # allow time for training
-        trian_start = time.now()
+        train_start = time.time()
 
         # update logs with basic info
         log.rid_to_uids[rid] = list(range(len(participants)))
@@ -71,7 +76,8 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
         log.next_rid += 1
 
         # retrieve user weights
-        if time.now() - train_start < TRAIN_TIME:
+        if time.time() - train_start < TRAIN_TIME:
+            print("Now we wait...")
             time.sleep(TRAIN_TIME)
 
 
@@ -84,3 +90,7 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
 
                 log.uid_rid_to_weights[(pid, rid)] = w
                 log.uid_rid_to_weights[uid].append(w)
+
+        # TODO: add weights to global model
+
+        # TODO: handle user requests to updates and deletes

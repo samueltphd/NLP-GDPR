@@ -8,8 +8,9 @@ import pandas as pd
 
 import random
 import sys
+import threading
 
-TEST_LENGTH = 10.
+TEST_LENGTH = 10
 
 try:
     num_tests        = int(sys.argv[1])
@@ -30,8 +31,6 @@ def update_id(x):
     return hash(x) % num_users
 
 data['id'] = data['id'].apply(update_id)
-
-print(data.columns)
 
 data, data_reserves = data.iloc[:, :len(data) // 2], data.iloc[:len(data) // 2, :]
 
@@ -70,6 +69,8 @@ def initialize_users():
 def setup_test():
     global data, users
 
+    print("Setting up environment...")
+
     initialize_log()
     initialize_aggregator()
     initialize_users()
@@ -81,27 +82,29 @@ def setup_test():
         all_posts = data.loc[data['id'] == uid]
         sample_posts = all_posts.sample(n = len(all_posts) // 2)
 
-        u.data = [{'id': uid, 'val': x['body'] for x in sample_posts}]
+        u.data = [{'id': uid, 'val': x['body']} for index, x in sample_posts.iterrows()]
 
 def run_test():
     global log, aggregator, users, TEST_LENGTH
 
-    train_q  = [PCQUeue() for _ in range(num_users)]
-    weight_q = [PCQUeue() for _ in range(num_users)]
-    update_q = [PCQUeue() for _ in range(num_users)]
-    delete_q = [PCQUeue() for _ in range(num_users)]
+    print("Running test...")
+
+    train_q  = [PCQueue() for _ in range(num_users)]
+    weight_q = [PCQueue() for _ in range(num_users)]
+    update_q = [PCQueue() for _ in range(num_users)]
+    delete_q = [PCQueue() for _ in range(num_users)]
 
     user_threads = [threading.Thread(target=user_thread, args=(users[id], id, TEST_LENGTH, train_q, weight_q, update_q, delete_q)) for id in range(num_users)]
     for u in user_threads:
         u.start()
 
-    server_thread = threading.Thread(target=server_thread, args=(aggregator, log, TEST_LENGTH, users, train_q, weight_q, update_q, delete_q))
-    server_thread.start()
+    st = threading.Thread(target=server_thread, args=(aggregator, log, TEST_LENGTH, users, train_q, weight_q, update_q, delete_q))
+    st.start()
 
     for u in user_threads:
         u.join()
 
-    server_thread.join()
+    st.join()
 
 def destroy_test():
     global log, aggregator, users
