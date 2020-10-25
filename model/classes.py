@@ -268,40 +268,6 @@ class Aggregator:
         - For each of these, call the train() function on each user's device
         """
         # get the training function and the data selection function for each user
-<<<<<<< HEAD
-        train_f, data_f, rid = t_round.get_training_function(), t_round.get_data_function(),t_round.get_round_id()
-        selected_users = self.logger.sample_users(num_participants)
-        weights_returned = {}
-        for uid in selected_users:
-            user = self.logger.get_user(uid)
-            # tell that user to train and give back the weights
-            output = user.train(t_round) # this should already log their weight contribution
-            # update to the weights_returned
-            weights_returned[uid] = output
-        # get the aggregator and the last checkpoint
-        previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
-        aggregation_f = t_round.get_aggregation_function()
-        # call aggregation_f to get the global weight updates and the weight updates function to send back to devices
-        global_weight_updates, uid_to_local_weight_fs = aggregation_f(weights=weights_returned, prev_weight=previous_global_checkpoint)
-        # set the global checkpoint (so the weights, not the updates)
-        self.logger.set_global_checkpoint(rid, rid, global_weight_updates)
-        # ask users to update the weights
-        for uid_to_locally_update in uid_to_local_weight_fs:
-            # user:
-            user = self.logger.get_user(uid)
-            # update_function: function that would take in a previous set of weights and output a new set of weights
-            # should handle input=None (in case this is the first training round)
-            update_function = uid_to_local_weight_fs[uid_to_locally_update]
-            # old weights:
-            old_local_weight = user.get_weight_from_rid(rid-1)
-            # new weights:
-            new_weight = update_function(old_local_weight)
-            # store it
-            user.associate_local_weight_with_rid(rid, new_weight)
-
-
-
-=======
         try:
             train_f, data_f, rid = t_round.get_training_function(), t_round.get_data_function(),t_round.get_round_id()
             selected_users = self.logger.sample_users(num_participants)
@@ -335,7 +301,6 @@ class Aggregator:
             
             
         
->>>>>>> d2062e7be46c47e3909b5db38e7baa1aaffa14a6
 
 
 
