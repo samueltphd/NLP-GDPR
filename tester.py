@@ -1,7 +1,12 @@
 from actors.server_thread import server_thread
 from actors.user_thread import user_thread
-from model.classes import User, Round, Aggregator, Log
+from model.aggregator import Aggregator
+from model.logger import Log
+from model.round import Round
+from model.user import User
 from utils import PCQueue
+
+from sklearn import datasets
 
 from datetime import datetime
 import pandas as pd
@@ -23,7 +28,9 @@ except Exception:
     print("python3 tester.py <num_tests> <num_users> <pct_gdpr_users> <pct_delete> <pct_update> <compliance_mode>")
     exit(1)
 
-data = pd.read_csv("reddit_data.csv")
+# data = pd.read_csv("reddit_data.csv")
+data = pd.read_csv("dummy.csv")
+# data = sklearn.digits.
 
 def update_id(x):
     global num_users
@@ -61,7 +68,7 @@ def initialize_users():
     for _ in range(num_users):
         uid = -1
         while uid in uids:
-            uid = data.loc[random.randint(0, len(data))]['id']
+            uid = data.loc[random.randint(0, len(data) - 1)]['id'] % num_users
 
         uids.append(uid)
         users.append(User(uid, aggregator, log, mode))
@@ -82,7 +89,8 @@ def setup_test():
         all_posts = data.loc[data['id'] == uid]
         sample_posts = all_posts.sample(n = len(all_posts) // 2)
 
-        u.data = [{'id': uid, 'val': x['body']} for index, x in sample_posts.iterrows()]
+        for index, x in sample_posts.iterrows():
+            u.add_data({'id': index, 'val': x['body']})
 
 def run_test():
     global log, aggregator, users, TEST_LENGTH
@@ -94,7 +102,7 @@ def run_test():
     update_q = [PCQueue() for _ in range(num_users)]
     delete_q = [PCQueue() for _ in range(num_users)]
 
-    user_threads = [threading.Thread(target=user_thread, args=(users[id], id, TEST_LENGTH, train_q, weight_q, update_q, delete_q)) for id in range(num_users)]
+    user_threads = [threading.Thread(target=user_thread, args=(users[id], TEST_LENGTH, train_q[id], weight_q[id], update_q[id], delete_q[id])) for id in range(num_users)]
     for u in user_threads:
         u.start()
 
@@ -132,7 +140,7 @@ def main():
         exit(1)
     run()
 
-    print("Total Operations: " + str(tests))
+    print("Total Tests:      " + str(tests))
     print("Total Deletions:  " + str(deletes))
     print("Total Updates:    " + str(updates))
 

@@ -8,8 +8,9 @@ class PCQueue:
     def deque(self):
         self.l.acquire()
         if len(self.q) > 0:
+            x = self.q.pop(0)
             self.l.release()
-            return self.l.pop(0)
+            return x
         else:
             self.l.release()
             return None

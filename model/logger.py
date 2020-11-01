@@ -117,7 +117,7 @@ class Log:
         return self.uid_rid_to_weights[(uid, rid)]
 
 
-    def sample_users(num_selecting_users):
+    def sample_users(self, num_selecting_users):
         # return a {uid (int): user (User)} dict
         random_ids = random.sample(self.uid_to_user.keys(), num_selecting_users)
         return {k: self.uid_to_user[k] for k in random_ids}

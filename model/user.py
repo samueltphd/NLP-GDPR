@@ -35,7 +35,7 @@ class User:
         # keep track of the pointer that points to this data poin
         self.data_id_to_data_point[value["id"]] = value
 
-    
+
     def remove_data(self, data_id, deep=True):
         assert data_id in self.data_id_to_data_point
         data_point = self.data_id_to_data_point[data_id]
@@ -67,7 +67,7 @@ class User:
             self.uncommitted_update.extend(data_point["rids"])
             self.uncommitted_update = list(set(self.uncommitted_update))
 
-    
+
     def get_opted_in_data(self):
         """ Get opted in data for training """
         return [e for e in self.data if e["opt_in"]]
@@ -89,7 +89,7 @@ class User:
         return self.rid_to_local_weight[rid]
 
 
-    
+
 
     def change_data_permission(self, data_id, value=False, deep=True):
         """
@@ -142,7 +142,7 @@ class User:
         # return the data so the aggregator can get it
         return output
 
-    
+
     def update_weights(self, prev_rid, new_rid, update_func):
         try:
             assert prev_rid in self.rid_to_local_weight

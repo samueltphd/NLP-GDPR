@@ -2,7 +2,7 @@
 NO_COMPLIANCE, VERY_WEAK, WEAK, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3, 4, 5
 
 class Round:
-    def __init__(self, rid, training_function, data_function, aggregation_function, num_participating_devices):
+    def __init__(self, rid, training_function, data_function, aggregation_function, num_participants):
         # instantiating a round with round ids
         self.rid = rid
         # training function:
