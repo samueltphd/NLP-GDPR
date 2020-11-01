@@ -1,3 +1,6 @@
+# different modes of GDPR compliance
+NO_COMPLIANCE, VERY_WEAK, WEAK, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3, 4, 5
+
 class User:
     def __init__(self, uid, aggregator, logger, compliance_mode=VERY_WEAK):
         self.uid = uid # user id
