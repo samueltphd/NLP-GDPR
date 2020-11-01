@@ -34,7 +34,7 @@ class Round:
 
 
     def get_data_function(self):
-        return self.get_data_function
+        return self.data_function
 
 
     def get_aggregation_function(self):
