@@ -49,7 +49,7 @@ class Aggregator:
                 aggregator = t_round.get_aggregation_function()
                 prev_weights = self.logger.get_global_checkpoint(rid - 1) # none or the checkpoints from previous
                 # if update, then additionally you would update the new_weights to include the new one
-                new_weights[uid] = 
+                # new_weights[uid] =
                 updated_weights, uid_to_local_weights = aggregator(weights=new_weights, prev_weight=prev_weights)
         except Exception as e:
             print("Exception caught in user_request_update_strong: ", e)
@@ -163,7 +163,7 @@ class Aggregator:
                         # should handle input=None (in case this is the first training round)
                         update_function = uid_to_local_weight_fs[uid_to_locally_update]
                         # tell the user to update with this update function
-                        self.user.update_weights(rid-1, rid, update_function)
+                        user.update_weights(rid-1, rid, update_function)
             except Exception as e:
                 if compliance_mode == STRICT: return False
                 continue
@@ -171,6 +171,7 @@ class Aggregator:
 
 
     def basic_train(self, t_round):
+        print(t_round)
         """
         function to do the server's training algorithm as demonstrated in the paper. The list of things that it will do:
         - Select randomly num_participants users to train stuff
@@ -178,7 +179,7 @@ class Aggregator:
         """
         # get the training function and the data selection function for each user
         try:
-            train_f, data_f, rid = t_round.get_training_function(), t_round.get_data_function(),t_round.get_round_id()
+            train_f, rid = t_round.get_training_function(), t_round.get_round_id()
             selected_users = self.logger.sample_users(t_round.num_participants)
             weights_returned = {}
             for uid in selected_users:
@@ -202,9 +203,8 @@ class Aggregator:
                 # should handle input=None (in case this is the first training round)
                 update_function = uid_to_local_weight_fs[uid_to_locally_update]
                 # tell the user to update with this update function
-                self.user.update_weights(rid-1, rid, update_function)
+                user.update_weights(rid-1, rid, update_function)
             return True
         except Exception as e:
             print("Exception caught: ", e)
             return False
-            
