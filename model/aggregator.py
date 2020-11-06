@@ -63,7 +63,8 @@ class Aggregator:
             # if all is done, return True (successful)
             return True
         # if somewhere fails, return False
-        return False
+        except Exception as e:
+            return False
 
 
 
@@ -108,7 +109,7 @@ class Aggregator:
                         output = user.train(t_round)                        
                         # update the new_weights to reflect the (potentially) new contribution
                         # from this uid
-                        if uid in new weights: # to prevent the case where a deletion was scheduled - 
+                        if uid in new_weights: # to prevent the case where a deletion was scheduled - 
                             new_weights[uid] = output
                 # by this time, we have already had a finalized new_weights. Now we will aggregate!
                 aggregator = t_round.get_aggregation_function()
@@ -135,12 +136,6 @@ class Aggregator:
             return False
         return True
 
-
-
-                
-
-            
-        
 
 
     def user_request_update_strict(self, uid: int, rids: list, request_type=DELETE):
