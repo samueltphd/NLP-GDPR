@@ -94,8 +94,6 @@ class User:
         return self.rid_to_local_weight[rid]
 
 
-
-
     def change_data_permission(self, data_id, value=False, deep=True):
         """
         opt data in or out of training.

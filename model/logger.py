@@ -43,10 +43,10 @@ class Log:
         output: None
         TODO: Having to log the weights that they participated might reveal information about them
         """
-        if uid not in self.uid_to_rids: self.uid_to_rids[uid] = [rid]
-        else: self.uid_to_rids[uid].append(rid)
-        if rid not in self.rid_to_uids: self.rid_to_uids[rid] = [uid]
-        else: self.rid_to_uids[rid].append(uid)
+        if uid not in self.uid_to_rids: self.uid_to_rids[uid] = []
+        if rid not in self.uid_to_rids[uid]: self.uid_to_rids[uid].append(rid)
+        if rid not in self.rid_to_uids: self.rid_to_uids[rid] = []
+        if uid not in self.rid_to_uids[rid]: self.rid_to_uids[rid].append(uid)
         # adding weights that uid and rid that contributed
         self.uid_rid_to_weights[(uid, rid)] = weights
 
