@@ -1,19 +1,32 @@
 # different modes of GDPR compliance
-NO_COMPLIANCE, VERY_WEAK, WEAK, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3, 4, 5
+NO_COMPLIANCE, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3
+DELETE, UPDATE = "DELETE", "UPDATE"
 
+# SHALLOW DELETION/UPDATES: NEUTRAL
+# BADGE DELETION/UPDATES: STRONG
+# ONE USER AT A TIME DELETION/UPDATES: STRICT
 class Aggregator:
-    def __init__(self, logger, compliance_mode=VERY_WEAK):
+    def __init__(self, logger, compliance_mode=NO_COMPLIANCE, badge_limit=10):
         self.logger = logger
         self.compliance_mode = compliance_mode
+        if compliance_mode == STRONG:
+            # data structure to map from id (int) to list of (round, request_type)
+            self.to_updates = {}
+            self.badge_limit = badge_limit
+
+    
+    def get_to_update_dict(self):
+        return self.to_updates
 
 
-    def user_request_update_weak(self, uid: int, rids: list, request_type="delete"):
+    def user_request_update_weak(self, uid: int, rids: list, request_type=DELETE):
+        assert self.compliance_mode == NEUTRAL
         try:
             # What this will do is just call the logger to remove user information in there
             for rid in rids:
-                # if type == "delete" or "update", both has to go through this
+                # if type == DELETE or UPDATE, both has to go through this
                 self.logger.delete_round_participated(uid, rid)
-                if request_type == "update":
+                if request_type == UPDATE:
                     # get the round
                     t_round = self.logger.get_round(rid)
                     # get the user
@@ -31,8 +44,55 @@ class Aggregator:
             return False
         return True
 
+    
+    def user_request_update_strong(self, uid: int, rids: list, request_type=DELETE):
+        assert self.compliance_mode == STRONG
+        try:
+            # for each round id
+            for rid in rids:
+                # just add the update request to our self.to_updates data structure
+                if uid not in self.to_updates: self.to_updates[uid] = []
+                if (rid, request_type) not in self.to_updates[uid]:
+                    self.to_updates[uid].append((rid, request_type))
+            # if the length exceeds a certain threshold:
+            if len(rid) >= self.badge_limit:
+                self.process_badge_request()
+            # if all is done, return True (successful)
+            return True
+        # if somewhere fails, return False
+        return False
 
-    def user_request_update_strong(self, uid: int, rids: list, request_type="delete"):
+
+
+    def process_badge_request(self):
+        assert self.compliance_mode == STRONG
+        to_update_dict = self.get_to_update_dict()
+        # temp variables to keep track of the rid -> uids that requested to delete/update
+        rid_to_uids_delete, rid_to_uids_update = {}, {}
+        temp = {DELETE: rid_to_uids_delete, UPDATE: rid_to_uids_update}
+        # for each user in to_update_dict:
+        for uid in to_update_dict:
+            # there will be an associated list of rounds that this user requested to update
+            rids_to_types = to_update_dict[uid]
+            for rid_type in rids_to_types:
+                rid, t = rid_type[0], rid_type[1]
+                # get the rid_to_uid_delete/update dict to update depending on the type of request
+                rid_to_uids_type = temp[t]
+                # and then check if this rid is already in there and stuff
+                if rid not in rid_to_uids_type: rid_to_uids_type[rid] = []
+                # associate this uid with this round update
+                if uid not in rid_to_uids_type[rid]: rid_to_uids_type[rid].append(uid)
+        # okay. now we gonna process the delete dicts first - they easier
+        for rid in rid_to_uids_delete:
+                
+                
+
+            
+        
+
+
+    def user_request_update_strict(self, uid: int, rids: list, request_type=DELETE):
+        assert self.compliance_mode == STRICT
         try:
             # get the user
             user = self.logger.get_user(uid)
@@ -40,8 +100,10 @@ class Aggregator:
             min_rid = min(rids)
             # and then cascadedly update the weights
             for rid in range(min_rid, self.logger.get_next_rid()):
-                t_round = self.logger.get_round(rid) # get the round
-                output = user.train(t_round) # get the output from training
+                # get the round
+                t_round = self.logger.get_round(rid)
+                # get the output from training
+                output = user.train(t_round)
                 # get the weight contributed by this uid to this rid in the past
                 old_weight = self.logger.get_weight_contributed_by_device(uid, rid)
                 # get all the weights from previous rounds excluding this uid
@@ -49,7 +111,9 @@ class Aggregator:
                 aggregator = t_round.get_aggregation_function()
                 prev_weights = self.logger.get_global_checkpoint(rid - 1) # none or the checkpoints from previous
                 # if update, then additionally you would update the new_weights to include the new one
-                # new_weights[uid] =
+                if request_type == UPDATE:
+                    new_weights[uid] = output
+                # and then using the aggregator function to get the new global weights and the function to update each
                 updated_weights, uid_to_local_weights = aggregator(weights=new_weights, prev_weight=prev_weights)
         except Exception as e:
             print("Exception caught in user_request_update_strong: ", e)
@@ -58,14 +122,15 @@ class Aggregator:
 
 
 
-    def user_request_update(self, uid, rids: list, request_type="delete", compliance_mode=VERY_WEAK):
+    def user_request_update(self, uid, rids: list, request_type=DELETE, compliance_mode=NO_COMPLIANCE):
         # if it is a weak compliance mode
-        if compliance_mode == WEAK: self.user_request_update_weak(uid, rids, request_type)
-        if compliance_mode >= STRONG: self.user_request_update_strong(uid, rids, request_type)
+        if compliance_mode == NEUTRAL: self.user_request_update_weak(uid, rids, request_type)
+        if compliance_mode == STRONG: self.user_request_update_strong(uid, rids, request_type)
+        if compliance_mode == STRICT: self.user_request_update_strict(uid, rids, request_type)
 
 
 
-    def remove_user_from_rounds(self, uid: int, rids: list, compliance_mode=VERY_WEAK):
+    def remove_user_from_rounds(self, uid: int, rids: list, compliance_mode=NO_COMPLIANCE):
         """
         function to remove the user from round (i.e. their weight contribution in the round). List of things that its doing:
         - identify what the smallest round id to remove is
@@ -114,7 +179,7 @@ class Aggregator:
         return True
 
 
-    def update_user_participation_in_rounds(self, uid: int, rids: list, compliance_mode=VERY_WEAK):
+    def update_user_participation_in_rounds(self, uid: int, rids: list, compliance_mode=NO_COMPLIANCE):
         """
         function to update user's participation in different rounds (i.e. update the weights in the round).
 

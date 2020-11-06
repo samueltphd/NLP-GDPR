@@ -1,8 +1,13 @@
 # different modes of GDPR compliance
-NO_COMPLIANCE, VERY_WEAK, WEAK, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3, 4, 5
+NO_COMPLIANCE, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3
+DELETE, UPDATE = "DELETE", "UPDATE"
+
+# SHALLOW DELETION/UPDATES: NEUTRAL
+# BADGE DELETION/UPDATES: STRONG
+# ONE USER AT A TIME DELETION/UPDATES: STRICT
 
 class User:
-    def __init__(self, uid, aggregator, logger, compliance_mode=VERY_WEAK):
+    def __init__(self, uid, aggregator, logger, compliance_mode=NO_COMPLIANCE):
         self.uid = uid # user id
         self.aggregator = aggregator # aggregator that this user communicates with
         self.logger = logger # logger stores uid to the list of rids they participated in and the range of data they participated in
@@ -108,10 +113,10 @@ class User:
 
     def request_aggregator_update(self):
         # from the uncommitted, get the relevant round ids
-        self.aggregator.user_request_update(self.uid, self.uncommitted_delete, requestType="delete")
+        self.aggregator.user_request_update(self.uid, self.uncommitted_delete, requestType=DELETE)
         self.uncommitted_delete = []
         # and then after the aggregator has successfully done this, we'll clear uncommitted
-        self.aggregator.user_request_update(self.uid, self.uncommitted_update, requestType="update")
+        self.aggregator.user_request_update(self.uid, self.uncommitted_update, requestType=UPDATE)
         self.uncommitted_update = []
 
 

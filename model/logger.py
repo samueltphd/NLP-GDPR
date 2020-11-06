@@ -1,7 +1,13 @@
 import random
 
 # different modes of GDPR compliance
-NO_COMPLIANCE, VERY_WEAK, WEAK, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3, 4, 5
+NO_COMPLIANCE, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3
+DELETE, UPDATE = "DELETE", "UPDATE"
+
+
+# SHALLOW DELETION/UPDATES: NEUTRAL
+# BADGE DELETION/UPDATES: STRONG
+# ONE USER AT A TIME DELETION/UPDATES: STRICT
 
 """
 The design of this Logger is so that everything is logged only AFTER the changes have been made - i.e. only log that
