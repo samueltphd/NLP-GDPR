@@ -1,3 +1,5 @@
+import threading
+
 # different modes of GDPR compliance
 NO_COMPLIANCE, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3
 DELETE, UPDATE = "DELETE", "UPDATE"
@@ -9,12 +11,13 @@ class Aggregator:
     def __init__(self, logger, compliance_mode=NO_COMPLIANCE, badge_limit=10):
         self.logger = logger
         self.compliance_mode = compliance_mode
+        self.lock = threading.Lock()
         if compliance_mode == STRONG:
             # data structure to map from id (int) to list of (round, request_type)
             self.to_updates = {}
             self.badge_limit = badge_limit
 
-    
+
     def get_to_update_dict(self):
         return self.to_updates
 
@@ -47,7 +50,7 @@ class Aggregator:
             return False
         return True
 
-    
+
     def user_request_update_strong(self, uid: int, rids: list, request_type=DELETE):
         assert self.compliance_mode == STRONG
         try:
@@ -106,10 +109,10 @@ class Aggregator:
                     # for each user who did so
                     for uid in rid_to_uids_update[rid]:
                         # we will get the output from training on that user device
-                        output = user.train(t_round)                        
+                        output = user.train(t_round)
                         # update the new_weights to reflect the (potentially) new contribution
                         # from this uid
-                        if uid in new_weights: # to prevent the case where a deletion was scheduled - 
+                        if uid in new_weights: # to prevent the case where a deletion was scheduled -
                             new_weights[uid] = output
                 # by this time, we have already had a finalized new_weights. Now we will aggregate!
                 aggregator = t_round.get_aggregation_function()
@@ -184,10 +187,11 @@ class Aggregator:
 
     def user_request_update(self, uid, rids: list, request_type=DELETE, compliance_mode=NO_COMPLIANCE):
         # if it is a weak compliance mode
+        self.lock.acquire()
         if compliance_mode == NEUTRAL: self.user_request_update_weak(uid, rids, request_type)
         if compliance_mode == STRONG: self.user_request_update_strong(uid, rids, request_type)
         if compliance_mode == STRICT: self.user_request_update_strict(uid, rids, request_type)
-
+        self.lock.release()
 
 
     def basic_train(self, t_round):
@@ -221,7 +225,8 @@ class Aggregator:
                 # should handle input=None (in case this is the first training round)
                 update_function = uid_to_local_weight_fs[uid_to_locally_update]
                 # tell the user to update with this update function
-                user.update_weights(rid-1, rid, update_function)
+                if user is not None:
+                    user.update_weights(rid-1, rid, update_function)
             # set the global checkpoint (so the weights, not the updates)
             self.logger.set_global_checkpoint(rid, rid, global_weights)
             # and then, got hrough each user to update their weight contribution in this round

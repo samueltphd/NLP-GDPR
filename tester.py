@@ -6,7 +6,7 @@ from model.round import Round
 from model.user import User
 from utils import PCQueue
 
-from sklearn import datasets
+from tensorflow.keras.datasets import mnist
 
 from datetime import datetime
 import pandas as pd
@@ -29,8 +29,9 @@ except Exception:
     exit(1)
 
 # data = pd.read_csv("reddit_data.csv")
-data = pd.read_csv("dummy.csv")
-# data = sklearn.digits.
+# data = pd.read_csv("dummy.csv", index_col=False)
+(xtrain, ytrain), (xtest, ytest) = mnist.load_data()
+data = pd.DataFrame(columns=['id','body','target'], data=[[random.randint(1,100), x, y] for x, y in zip(xtrain, ytrain)])
 
 def update_id(x):
     global num_users
@@ -92,8 +93,10 @@ def setup_test():
         for index, x in sample_posts.iterrows():
             u.add_data({'id': index, 'val': x['body']})
 
+    print("All data flushed!")
+
 def run_test():
-    global log, aggregator, users, TEST_LENGTH
+    global log, aggregator, users, TEST_LENGTH, data_reserves
 
     print("Running test...")
 
@@ -102,7 +105,7 @@ def run_test():
     update_q = [PCQueue() for _ in range(num_users)]
     delete_q = [PCQueue() for _ in range(num_users)]
 
-    user_threads = [threading.Thread(target=user_thread, args=(users[id], TEST_LENGTH, train_q[id], weight_q[id], update_q[id], delete_q[id])) for id in range(num_users)]
+    user_threads = [threading.Thread(target=user_thread, args=(users[id], TEST_LENGTH, train_q[id], weight_q[id], update_q[id], delete_q[id], data_reserves)) for id in range(num_users)]
     for u in user_threads:
         u.start()
 

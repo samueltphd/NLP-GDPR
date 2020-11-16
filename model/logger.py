@@ -125,5 +125,5 @@ class Log:
 
     def sample_users(self, num_selecting_users):
         # return a {uid (int): user (User)} dict
-        random_ids = random.sample(self.uid_to_user.keys(), num_selecting_users)
+        random_ids = random.sample(self.uid_to_user.keys(), min(num_selecting_users, len(self.uid_to_user.keys())))
         return {k: self.uid_to_user[k] for k in random_ids}
