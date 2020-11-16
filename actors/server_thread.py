@@ -1,18 +1,24 @@
+from model.mnist import federatedSGD
+from model.mnist import localTrainingFederatedSGD
 from model.round import Round
+
+import numpy as np
 
 import random
 import time
 
 TRAIN_TIME = 1
-def afunc(weights, prev_weight):
-    return [1], {k: lambda k: [1] for k in range(10)} # TODO: BAD! DON'T KEEP! CHANGE PLZ
+DIMENSION  = 28 * 28
 
-def dfunc(_input, data_pct=.5):
+def afunc(uid_to_weights, prev_weights):
+    return federatedSGD(uid_to_weights, prev_weights)
+
+def dfunc(_input, data_pct=1):
     random.shuffle(_input)
     return _input[:int(len(_input) * data_pct)]
 
-def tfunc(t_data):
-    return [0,1,0,1]
+def tfunc(t_data, global_weights):
+    return localTrainingFederatedSGD(t_data, global_weights)
 
 def handle_update(x, i):
     pass
@@ -31,21 +37,13 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
 
     start = time.time()
     print("Starting server thread at: " + str(start))
-
-    # set up log information
-    # log.rounds                    = {}
-    # log.uid_to_rids               = {i: [] for i in range(len(users))}
-    # log.rid_to_uids               = {}
-    # log.uid_to_weights            = {i: [] for i in range(len(users))}
-    # log.uid_rid_to_weights        = {}
-    # log.uid_to_user               = {i: users[i] for i in range(len(users))}
-    # log.rid_to_round              = {}
-    # log.rid_to_global_checkpoints = {}
-    # log.next_rid                  = 1
+    print("[server thread] running simulation for " + str(_tlength) + " seconds")
+    # initialize global weights of round -1 to be random
+    log.set_global_checkpoint(-1, np.array([random.randint(1, 10) for _ in range(DIMENSION)]))
 
     rid = 0
     while time.time() - start < _tlength:
-        print(time.time() - start)
+        print("[server thread] Starting round " + str(rid) + " at time: " + str(time.time() - start))
         # determine number of users to participate in the next round
         r = random.randrange(1, len(users) + 1)
 
@@ -58,54 +56,15 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
             r                       # number of participating devices
         )
 
-        # add round to the log
-        # log.rounds[rid] = round
-        # log.rid_to_round[rid] = round
-
         # determine users
         participants = random.sample(users, r)
         pids = [users.index(p) for p in participants]
 
-        print("Sending training requests...")
-        # send training request to participants
-        for pid, p in zip(pids, participants):
-            train_qs[pid].enque(round)
+        # tell aggregator to make users train on data
+        print("[server thread] calling on users to train...")
+        aggregator.basic_train(round, train_qs, weight_qs)
 
-            # if pid in log.uid_to_rids.keys():
-            #     log.uid_to_rids[pid].append(rid)
-            # else:
-            #     log.uid_to_rids[pid] = [rid]
-
-        # allow time for training
-        train_start = time.time()
-
-        # update logs with basic info
-        # log.rid_to_uids[rid] = list(range(len(participants)))
-
-        # rid          += 1
-        # log.next_rid += 1
-
-        # retrieve user weights
-        if time.time() - train_start < TRAIN_TIME:
-            print("Now we wait...")
-            time.sleep(TRAIN_TIME)
-
-
-        weights = [0 for _ in range(len(users))]
-        for pid in pids:
-            w = weight_qs[pid].deque()
-
-            if w is not None:
-                weights[pid] = w
-
-                # log.uid_rid_to_weights[(pid, rid)] = w
-                # log.uid_rid_to_weights[uid].append(w)
-
-        # TODO: add weights to global model
-        aggregator.basic_train(round)
-
-        # TODO: handle user requests to updates and deletes
-
+        # TODO: handle user requests to updates and deletes => update logger
         for i in range(len(users)):
             _update = update_qs[i].deque()
             _delete = delete_qs[i].deque()
@@ -117,3 +76,5 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
             if _delete is not None:
                 # handle delete
                 handle_delete(_delete, i)
+
+        rid += 1

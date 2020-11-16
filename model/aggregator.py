@@ -1,8 +1,11 @@
 import threading
+import time
 
 # different modes of GDPR compliance
 NO_COMPLIANCE, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3
 DELETE, UPDATE = "DELETE", "UPDATE"
+
+TRAIN_TIME = 30
 
 # SHALLOW DELETION/UPDATES: NEUTRAL
 # BADGE DELETION/UPDATES: STRONG
@@ -38,7 +41,7 @@ class Aggregator:
                     # get the user
                     user = self.logger.get_user(uid)
                     # get the output from training
-                    output = user.train(t_round)
+                    output = user.train(t_round, self.logger.get_global_checkpoint(rid - 1))
                     # get the weight contributed by this uid to this rid in the past
                     old_weight = self.logger.get_weight_contributed_by_device(uid, rid)
                     # if its the same, then there's no need to update anything this round
@@ -194,45 +197,58 @@ class Aggregator:
         self.lock.release()
 
 
-    def basic_train(self, t_round):
-        print(t_round)
+    def basic_train(self, t_round, producer_qs, consumer_qs):
         """
         function to do the server's training algorithm as demonstrated in the paper. The list of things that it will do:
         - Select randomly num_participants users to train stuff
         - For each of these, call the train() function on each user's device
         """
         # get the training function and the data selection function for each user
-        try:
-            train_f, rid = t_round.get_training_function(), t_round.get_round_id()
-            selected_users = self.logger.sample_users(t_round.num_participants)
-            weights_returned = {}
+        # try:
+        train_f, rid = t_round.get_training_function(), t_round.get_round_id()
+        previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
+        selected_users = self.logger.sample_users(t_round.num_participants)
+        weights_returned = {}
+        for uid in selected_users:
+            user = self.logger.get_user(uid)
+            # tell that user to train and give back the weights
+            producer_qs[uid].enque((user.train, t_round, previous_global_checkpoint))
+        # wait for the users to train on their data
+        time.sleep(TRAIN_TIME)
+        # begin retreiving user weights from the users
+        received = 0
+        while received < len(selected_users):
             for uid in selected_users:
                 user = self.logger.get_user(uid)
-                # tell that user to train and give back the weights
-                output = user.train(t_round) # this should already log their weight contribution
-                # update to the weights_returned
-                weights_returned[uid] = output
-            # get the aggregator and the last checkpoint
-            previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
-            aggregation_f = t_round.get_aggregation_function()
-            # call aggregation_f to get the global weight updates and the weight updates function to send back to devices
-            global_weights, uid_to_local_weight_fs = aggregation_f(weights=weights_returned, prev_weight=previous_global_checkpoint)
-            # ask users to update the weights
-            for uid_to_locally_update in uid_to_local_weight_fs:
-                # user:
-                user = self.logger.get_user(uid_to_locally_update)
-                # update_function: function that would take in a previous set of weights and output a new set of weights
-                # should handle input=None (in case this is the first training round)
-                update_function = uid_to_local_weight_fs[uid_to_locally_update]
-                # tell the user to update with this update function
-                if user is not None:
-                    user.update_weights(rid-1, rid, update_function)
-            # set the global checkpoint (so the weights, not the updates)
-            self.logger.set_global_checkpoint(rid, rid, global_weights)
-            # and then, got hrough each user to update their weight contribution in this round
-            for uid in weights_returned:
-                self.logger.log_round_participated(uid, rid, weights_returned[uid])
-            return True
-        except Exception as e:
-            print("Exception caught: ", e)
-            return False
+                # the user will place their weights in their producer queue, so
+                # try to deque from that queue if it isn't empty
+                output = consumer_qs[uid].deque()
+                if output is not None:
+                    # update to the weights_returned
+                    print("Aggregator received weight from user " + str(uid))
+                    weights_returned[uid] = output
+                    received += 1
+
+        # get the aggregator and the last checkpoint
+        aggregation_f = t_round.get_aggregation_function()
+        # call aggregation_f to get the global weight updates and the weight updates function to send back to devices
+        global_weights, uid_to_local_weight_fs = aggregation_f(uid_to_weights=weights_returned, prev_weights=previous_global_checkpoint)
+        # ask users to update the weights
+        for uid_to_locally_update in uid_to_local_weight_fs:
+            # user:
+            user = self.logger.get_user(uid_to_locally_update)
+            # update_function: function that would take in a previous set of weights and output a new set of weights
+            # should handle input=None (in case this is the first training round)
+            update_function = uid_to_local_weight_fs[uid_to_locally_update]
+            # tell the user to update with this update function
+            if user is not None:
+                user.update_weights(rid-1, rid, update_function)
+        # set the global checkpoint (so the weights, not the updates)
+        self.logger.set_global_checkpoint(rid, global_weights)
+        # and then, got hrough each user to update their weight contribution in this round
+        for uid in weights_returned:
+            self.logger.log_round_participated(uid, rid, weights_returned[uid])
+        return True
+        # except Exception as e:
+        #     print("Exception caught: ", e)
+        #     return False

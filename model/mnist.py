@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 ############################# vanilla stuff #############################
 
-def FederatedSGD(uid_to_weight, prev_weights, C=1, learning_rate=0.01):
+def federatedSGD(uid_to_weight, prev_weights, C=1, learning_rate=0.01):
     # aggregation function:
     # - input:
     #       + dict of weights from all the different devices. format:
@@ -21,9 +21,9 @@ def FederatedSGD(uid_to_weight, prev_weights, C=1, learning_rate=0.01):
     #           the current set of weights from the user, and update it to be something)
     #           +-+-+ weight function: a function that takes in a previous set of weights and output a novel set of weights
     running_sum = None
-    for uid in uid_to_weight:
+    for uid in uid_to_weight.keys():
         weight = uid_to_weight[uid]
-        if running_sum == None: running_sum = weight.copy()
+        if running_sum is None: running_sum = weight.copy()
         else:
             assert len(weight) == len(running_sum)
             running_sum += weight
@@ -31,11 +31,11 @@ def FederatedSGD(uid_to_weight, prev_weights, C=1, learning_rate=0.01):
     assert len(gradient) == len(prev_weights)
     new_weight = prev_weights - gradient
     # for this basic learning algorithm, just ask everyone to update to the same weight
-    update_dict = {k: lambda x: new_weight for k in uid}
+    update_dict = {k: lambda x: new_weight for k in uid_to_weight}
     return new_weight, update_dict
 
 
-def localTrainingFederatedSGD(data, global_weights, num_batches=1, epochs=100, learning_rate=0.01):
+def localTrainingFederatedSGD(data, global_weights, num_batches=1, epochs=10, learning_rate=0.01):
     # training function:
     # - input: the data that the data function outputs, AND that takes into account existing weights from the user
     # - output: the weights that are going to be sent back to the aggregator
@@ -43,16 +43,16 @@ def localTrainingFederatedSGD(data, global_weights, num_batches=1, epochs=100, l
     assert data != None
     # random shuffle the data
     random.shuffle(data)
-    Xs, Ys = np.array([data_point["x"] for data_point in data]), np.array([data_point["y"] for data_point in data])
-    data = zip(Xs, Ys)
+    Xs, Ys = np.array([data_point["val"] for data_point in data]), np.array([data_point["target"] for data_point in data])
+    data = np.array(list(zip(Xs, Ys)), dtype=object)
     # determine what the number of batches is
     batches = np.split(data, num_batches)
     new_weights = global_weights.copy()
-    for ep in epochs:
+    for ep in range(epochs):
         for batch in batches:
             Xs, Ys = np.array([np.array(ele[0]) for ele in batch]), np.array([ele[1] for ele in batch])
-            prediction = np.dot(global_weights, Xs) # maybe factor in the bias factor?
-            loss = prediction-Ys
+            prediction = np.dot(Xs, new_weights) # maybe factor in the bias factor?
+            loss = np.sum(np.abs(prediction-Ys))/Ys.size
             new_weights = new_weights-learning_rate*loss
     return new_weights
 
@@ -145,5 +145,3 @@ class LocalUpdate(object):
                 batch_loss.append(loss.item())
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
         return net.state_dict(), sum(epoch_loss) / len(epoch_loss)
-
-

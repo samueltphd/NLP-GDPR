@@ -15,7 +15,7 @@ import random
 import sys
 import threading
 
-TEST_LENGTH = 10
+TEST_LENGTH = 300
 
 try:
     num_tests        = int(sys.argv[1])
@@ -31,7 +31,7 @@ except Exception:
 # data = pd.read_csv("reddit_data.csv")
 # data = pd.read_csv("dummy.csv", index_col=False)
 (xtrain, ytrain), (xtest, ytest) = mnist.load_data()
-data = pd.DataFrame(columns=['id','body','target'], data=[[random.randint(1,100), x, y] for x, y in zip(xtrain, ytrain)])
+data = pd.DataFrame(columns=['id','body','target'], data=[[random.randint(1,100), x.flatten(), y] for x, y in zip(xtrain, ytrain)])
 
 def update_id(x):
     global num_users
@@ -72,7 +72,10 @@ def initialize_users():
             uid = data.loc[random.randint(0, len(data) - 1)]['id'] % num_users
 
         uids.append(uid)
-        users.append(User(uid, aggregator, log, mode))
+        u = User(uid, aggregator, log, mode)
+        users.append(u)
+
+        log.add_user(uid, u)
 
 def setup_test():
     global data, users
@@ -91,7 +94,7 @@ def setup_test():
         sample_posts = all_posts.sample(n = len(all_posts) // 2)
 
         for index, x in sample_posts.iterrows():
-            u.add_data({'id': index, 'val': x['body']})
+            u.add_data({'id': index, 'val': x['body'], 'target': x['target']})
 
     print("All data flushed!")
 

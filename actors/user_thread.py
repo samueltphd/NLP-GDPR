@@ -12,13 +12,21 @@ def user_thread(obj, _tlength, train_q, weight_q, update_q, delete_q, data_reser
 
     while time.time() - start < _tlength:
         # receive training requests from server thread
-
         trequest = train_q.deque()
 
         if trequest is not None:
-            weight_q.enque(obj.train(trequest))
+            print("[user thread " + str(obj.uid) + "] starting to train")
 
-        # determine any requests to be made to the aggregator
+            # call the training function with the appropriate global weights
+            # and the appropriate round information
+            result = trequest[0](trequest[1], trequest[2])
+            print("[user thread " + str(obj.uid) + "] training complete")
+            # send the results back to the aggregator
+            weight_q.enque(result)
+
+        # determine any requests to be made
+        # if so send request to aggregator to update logger
+        """
         r = random.randint(1, 100)
 
         if r < update_pct:
@@ -37,3 +45,4 @@ def user_thread(obj, _tlength, train_q, weight_q, update_q, delete_q, data_reser
                 to_remove = random.choice(obj.data)
 
                 obj.remove_data(to_remove['id'])
+        """
