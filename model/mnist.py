@@ -55,7 +55,7 @@ def localTrainingFederatedSGD(data, global_weights):
     assert data != None
     # random shuffle the data
     random.shuffle(data)
-    data = [(torch.tensor(data_point["val"]), torch.tensor(data_point["target"])) for data_point in data]
+    data = [(data_point["val"], data_point["target"]) for data_point in data]
     local = LocalUpdate(MNIST, data)
     state_dict, loss = local.train(deepcopy(global_weights)) # global weights, in this case, is a neural net
     return deepcopy(state_dict), deepcopy(loss)
@@ -104,7 +104,8 @@ class LocalUpdate(object):
         for iter in range(self.args['local_ep']):
             # print("Iteration:", iter)
             batch_loss = []
-            for batch_idx, (images, labels) in enumerate(self.ldr_train):
+            for batch_idx, lst in enumerate(self.ldr_train):
+                images, labels = torch.tensor([x[0] for x in lst]), torch.tensor([x[1] for x in lst])
                 # print("batch id: ", batch_idx)
                 images, labels = images.to(self.args['device']), labels.to(self.args['device'])
                 net.zero_grad()
