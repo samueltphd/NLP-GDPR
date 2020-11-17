@@ -1,5 +1,6 @@
 import threading
 import time
+from copy import deepcopy
 
 # different modes of GDPR compliance
 NO_COMPLIANCE, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3
@@ -41,13 +42,10 @@ class Aggregator:
                     # get the user
                     user = self.logger.get_user(uid)
                     # get the output from training
-                    output = user.train(t_round, self.logger.get_global_checkpoint(rid - 1))
-                    # get the weight contributed by this uid to this rid in the past
-                    old_weight = self.logger.get_weight_contributed_by_device(uid, rid)
-                    # if its the same, then there's no need to update anything this round
-                    if output == old_weight: continue
-                    # else, we update stuff
-                    else: self.logger.log_round_participated(uid, rid, output)
+                    output, localLoss = user.train(t_round, self.logger.get_global_checkpoint(rid))
+                    # update the state
+                    self.logger.log_round_participated(uid, rid, output)
+                    # dont do anything with local loss since we are not retraining again
         except Exception as e:
             print("Exception caught: ", e)
             return False
@@ -96,11 +94,13 @@ class Aggregator:
         min_rid = min([min(rid_to_uids_delete), min(rid_to_uids_update)])
         # starting from that rid onwards
         try:
+            # variable to keep track of the loss
+            loss_train = []
             for rid in range(min_rid, self.logger.get_next_rid()):
                 # get the round
                 t_round = self.logger.get_round(rid)
                 # get the output from training
-                output = user.train(t_round)
+                output, localLoss = user.train(t_round, self.logger.get_global_checkpoint(rid))
                 # if there is at least some user that requested their participation to
                 # be deleted from this round
                 if rid in rid_to_uids_delete: excluding = rid_to_uids_delete[rid]
@@ -110,13 +110,18 @@ class Aggregator:
                 # if there is at least some user who requested their contribution to be updated:
                 if rid in rid_to_uids_update:
                     # for each user who did so
+                    loss_locals = []
                     for uid in rid_to_uids_update[rid]:
                         # we will get the output from training on that user device
-                        output = user.train(t_round)
+                        output, localLoss = user.train(t_round, self.logger.get_global_checkpoint(rid))
                         # update the new_weights to reflect the (potentially) new contribution
                         # from this uid
                         if uid in new_weights: # to prevent the case where a deletion was scheduled -
                             new_weights[uid] = output
+                        # append loss locals
+                        loss_locals.append(deepcopy(localLoss))
+                    loss_avg = sum(loss_locals)/len(loss_locals)
+                    print('Round {:3d}, Average loss {:,3f}'.format(rid, loss_avg))
                 # by this time, we have already had a finalized new_weights. Now we will aggregate!
                 aggregator = t_round.get_aggregation_function()
                 prev_weights = self.logger.get_global_checkpoint(rid - 1)
@@ -156,13 +161,13 @@ class Aggregator:
                 # get the round
                 t_round = self.logger.get_round(rid)
                 # get the output from training
-                output = user.train(t_round)
-                # get the weight contributed by this uid to this rid in the past
-                old_weight = self.logger.get_weight_contributed_by_device(uid, rid)
-                # if the old_weight contributed by the device is the same as the new weight contribution, it
-                # means that the update has "converged", and so we just break and return
-                if old_weight == output:
-                    break
+                output, localLoss = user.train(t_round, self.logger.get_global_checkpoint(rid))
+                # # get the weight contributed by this uid to this rid in the past
+                # old_weight = self.logger.get_weight_contributed_by_device(uid, rid)
+                # # if the old_weight contributed by the device is the same as the new weight contribution, it
+                # # means that the update has "converged", and so we just break and return
+                # if old_weight == output:
+                #     break
                 # get all the weights from previous rounds excluding this uid
                 new_weights = self.logger.weights_given_rid_excluding_uids(rid, excluding_uids=[uid])
                 aggregator = t_round.get_aggregation_function()
@@ -205,7 +210,7 @@ class Aggregator:
         """
         # get the training function and the data selection function for each user
         # try:
-        train_f, rid = t_round.get_training_function(), t_round.get_round_id()
+        rid = t_round.get_round_id()
         previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
         selected_users = self.logger.sample_users(t_round.num_participants)
         weights_returned = {}
@@ -217,18 +222,21 @@ class Aggregator:
         time.sleep(TRAIN_TIME)
         # begin retreiving user weights from the users
         received = 0
+        loss_locals = []
         while received < len(selected_users):
             for uid in selected_users:
                 user = self.logger.get_user(uid)
                 # the user will place their weights in their producer queue, so
                 # try to deque from that queue if it isn't empty
-                output = consumer_qs[uid].deque()
+                output, localLoss = consumer_qs[uid].deque()
+                loss_locals.append(deepcopy(localLoss))
                 if output is not None:
                     # update to the weights_returned
                     print("Aggregator received weight from user " + str(uid))
-                    weights_returned[uid] = output
+                    weights_returned[uid] = deepcopy(output)
                     received += 1
-
+        loss_avg = sum(loss_locals)/len(loss_locals)
+        print('Round {:3d}, Average loss {:.3f}'.format(rid, loss_avg))
         # get the aggregator and the last checkpoint
         aggregation_f = t_round.get_aggregation_function()
         # call aggregation_f to get the global weight updates and the weight updates function to send back to devices

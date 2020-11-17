@@ -119,7 +119,7 @@ class User:
 
 
 
-    def train(self, t_round):
+    def train(self, t_round, global_weights):
         """
         function to ask the user to train based on their local data
         input: - round: A Round, with a training function that the user will do,
@@ -139,11 +139,11 @@ class User:
             if "rids" not in ele: ele["rids"] = []
             ele["rids"].append(rid)
         # getting the weights from the training function
-        output = train_f(training_data)
+        output, localLoss = train_f(training_data, global_weights) 
         # # ask the logger to log the round id
         # self.logger.log_round_participated(uid, rid, output) -- this should probably happen at the aggregator level
         # return the data so the aggregator can get it
-        return output
+        return output, localLoss
 
 
     def update_weights(self, prev_rid, new_rid, update_func):
