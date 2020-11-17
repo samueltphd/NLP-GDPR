@@ -1,4 +1,4 @@
-from model.mnist import federatedSGD, CNNMnist
+from model.mnist import federatedSGD, CNNMnist, MLP
 from model.mnist import localTrainingFederatedSGD
 from model.round import Round
 from model.consts import MNIST
@@ -7,6 +7,8 @@ import numpy as np
 
 import random
 import time
+
+import sys
 
 TRAIN_TIME = 1
 DIMENSION  = 28 * 28
@@ -40,8 +42,11 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
     print("[server thread] running simulation for " + str(_tlength) + " seconds")
     # initialize global weights of round -1 to be random
     # log.set_global_checkpoint(-1, np.array([random.randint(1, 10) for _ in range(DIMENSION)]))
-    log.set_global_checkpoint(-1, CNNMnist().to(MNIST['device']))
-
+    # net_glob = CNNMnist().to(MNIST['device'])
+    net_glob = MLP(dim_in=784, dim_hidden=200, dim_out=MNIST["num_classes"]).to(MNIST["device"])
+    print(net_glob)
+    net_glob.train()
+    log.set_global_checkpoint(-1, net_glob)
 
     rid = 0
     while time.time() - start < _tlength:

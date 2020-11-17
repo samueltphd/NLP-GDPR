@@ -44,7 +44,7 @@ def federatedSGD(uid_to_weight, prev_weights, C=1, learning_rate=0.01):
     # for this basic learning algorithm, just ask everyone to update their local stuff to
     # be the neural net
     update_dict = {k: lambda x: new_weights for k in uid_to_weight}
-    return new_weight, update_dict
+    return new_weights, update_dict
 
 
 def localTrainingFederatedSGD(data, global_weights):
@@ -57,7 +57,7 @@ def localTrainingFederatedSGD(data, global_weights):
     random.shuffle(data)
     d1, d2 = [], []
     for data_point in data:
-        d1.append(data_point["val"])
+        d1.append([data_point["val"]])
         d2.append(data_point["target"])
     data = (d1, d2)
     local = LocalUpdate(MNIST, data)
@@ -87,15 +87,35 @@ class CNNMnist(nn.Module):
         return x
 
 
+class MLP(nn.Module):
+    def __init__(self, dim_in, dim_hidden, dim_out):
+        super(MLP, self).__init__()
+        self.layer_input = nn.Linear(dim_in, dim_hidden)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout()
+        self.layer_hidden = nn.Linear(dim_hidden, dim_out)
+
+    def forward(self, x):
+        x = x.view(-1, x.shape[1]*x.shape[-2]*x.shape[-1])
+        x = self.layer_input(x)
+        x = self.dropout(x)
+        x = self.relu(x)
+        x = self.layer_hidden(x)
+        return x
+
+
 class LocalUpdate(object):
     def __init__(self, args, dataset):
         self.args = args
         self.loss_func = nn.CrossEntropyLoss()
+        self.dataset_len = len(dataset[0])
         # dataset here has to be a zip of sample and data point - it shall not be torch yet and we convert them to torch
         # constructing batches
         batches = []
+
         for index in range(0, len(dataset[0]), self.args['local_bs']):
-            batch = torch.tensor(dataset[0][index:min(index+self.args['local_bs'], len(dataset[0]))]),torch.tensor(dataset[1][index:min(index+self.args['local_bs'], len(dataset[1]))])
+            ending_index = min(index+self.args['local_bs'], len(dataset[0]))
+            batch = torch.tensor(dataset[0][index:ending_index]).float(),torch.tensor(dataset[1][index:ending_index]).long()
             batches.append(batch)
         self.ldr_train = batches
 
@@ -109,7 +129,10 @@ class LocalUpdate(object):
             # print("Iteration:", iter)
             batch_loss = []
             for batch_idx, (images, labels) in enumerate(self.ldr_train):
-                # print("batch id: ", batch_idx)
+                # print("self.dataset_len: ", self.dataset_len)
+                # print("batch size: ", len(self.ldr_train))
+                # print("len(images): ", len(images))
+                # print("images.shape[0]: ", images.shape[0])
                 images, labels = images.to(self.args['device']), labels.to(self.args['device'])
                 net.zero_grad()
                 log_probs = net(images)
@@ -118,8 +141,8 @@ class LocalUpdate(object):
                 optimizer.step()
                 if self.args['verbose'] and batch_idx % 10 == 0:
                     print('Update Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                        iter, batch_idx * len(images), len(self.ldr_train.dataset),
-                               100. * batch_idx / len(self.ldr_train), loss.item()))
+                        iter, batch_idx * len(images), self.dataset_len,
+                               100. * batch_idx / len(images), loss.item()))
                 batch_loss.append(loss.item())
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
         # print("returning: ", net.state_dict(), sum(epoch_loss) / len(epoch_loss))
