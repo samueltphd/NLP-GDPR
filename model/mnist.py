@@ -55,7 +55,11 @@ def localTrainingFederatedSGD(data, global_weights):
     assert data != None
     # random shuffle the data
     random.shuffle(data)
-    data = [(data_point["val"], data_point["target"]) for data_point in data]
+    d1, d2 = [], []
+    for data_point in data:
+        d1.append(data_point["val"])
+        d2.append(data_point["target"])
+    data = (d1, d2)
     local = LocalUpdate(MNIST, data)
     state_dict, loss = local.train(deepcopy(global_weights)) # global weights, in this case, is a neural net
     return deepcopy(state_dict), deepcopy(loss)
@@ -90,8 +94,8 @@ class LocalUpdate(object):
         # dataset here has to be a zip of sample and data point - it shall not be torch yet and we convert them to torch
         # constructing batches
         batches = []
-        for index in range(0, len(dataset), self.args['local_bs']):
-            batch = dataset[index:min(index+self.args['local_bs'], len(dataset))]
+        for index in range(0, len(dataset[0]), self.args['local_bs']):
+            batch = torch.tensor(dataset[0][index:min(index+self.args['local_bs'], len(dataset[0]))]),torch.tensor(dataset[1][index:min(index+self.args['local_bs'], len(dataset[1]))])
             batches.append(batch)
         self.ldr_train = batches
 
@@ -104,8 +108,7 @@ class LocalUpdate(object):
         for iter in range(self.args['local_ep']):
             # print("Iteration:", iter)
             batch_loss = []
-            for batch_idx, lst in enumerate(self.ldr_train):
-                images, labels = torch.tensor([x[0] for x in lst]), torch.tensor([x[1] for x in lst])
+            for batch_idx, (images, labels) in enumerate(self.ldr_train):
                 # print("batch id: ", batch_idx)
                 images, labels = images.to(self.args['device']), labels.to(self.args['device'])
                 net.zero_grad()

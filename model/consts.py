@@ -19,7 +19,7 @@ MNIST = {
     'dataset': 'mnist',
     'iid': True,
     'num_classes': 10,
-    'num_channels': 3,
+    'num_channels': 1,
     'gpu': 0,
     'stopping_rounds': 10,
     'verbose': True,

@@ -31,7 +31,7 @@ except Exception:
 # data = pd.read_csv("reddit_data.csv")
 # data = pd.read_csv("dummy.csv", index_col=False)
 (xtrain, ytrain), (xtest, ytest) = mnist.load_data()
-data = pd.DataFrame(columns=['id','body','target'], data=[[random.randint(1,100), x.flatten(), y] for x, y in zip(xtrain, ytrain)])
+data = pd.DataFrame(columns=['id','body','target'], data=[[random.randint(1,100), x, y] for x, y in zip(xtrain, ytrain)])
 
 def update_id(x):
     global num_users
