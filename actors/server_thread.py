@@ -1,6 +1,7 @@
-from model.mnist import federatedSGD
+from model.mnist import federatedSGD, CNNMnist
 from model.mnist import localTrainingFederatedSGD
 from model.round import Round
+from model.consts import MNIST
 
 import numpy as np
 
@@ -34,12 +35,13 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
               (3) Receive user requests for updates and deletes and handle them
     """
     global TRAIN_TIME
-
     start = time.time()
     print("Starting server thread at: " + str(start))
     print("[server thread] running simulation for " + str(_tlength) + " seconds")
     # initialize global weights of round -1 to be random
-    log.set_global_checkpoint(-1, np.array([random.randint(1, 10) for _ in range(DIMENSION)]))
+    # log.set_global_checkpoint(-1, np.array([random.randint(1, 10) for _ in range(DIMENSION)]))
+    log.set_global_checkpoint(-1, CNNMnist()).to(MNIST['device'])
+
 
     rid = 0
     while time.time() - start < _tlength:
@@ -48,7 +50,7 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
         r = random.randrange(1, len(users) + 1)
 
         # set up the round
-        round = Round(
+        new_round = Round(
             rid,                    # round id
             tfunc,                  # training function   => placeholder
             dfunc,                  # data function
@@ -62,7 +64,7 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
 
         # tell aggregator to make users train on data
         print("[server thread] calling on users to train...")
-        aggregator.basic_train(round, train_qs, weight_qs)
+        aggregator.basic_train(new_round, train_qs, weight_qs)
 
         # TODO: handle user requests to updates and deletes => update logger
         for i in range(len(users)):
