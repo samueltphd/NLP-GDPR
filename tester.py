@@ -1,9 +1,11 @@
 from actors.server_thread import server_thread
 from actors.user_thread import user_thread
+
 from model.aggregator import Aggregator
 from model.logger import Log
 from model.round import Round
 from model.user import User
+
 from utils import PCQueue
 
 from tensorflow.keras.datasets import mnist
@@ -15,7 +17,7 @@ import random
 import sys
 import threading
 
-TEST_LENGTH = 300
+TEST_LENGTH = 1
 
 try:
     num_tests        = int(sys.argv[1])
@@ -108,17 +110,21 @@ def run_test():
     update_q = [PCQueue() for _ in range(num_users)]
     delete_q = [PCQueue() for _ in range(num_users)]
 
+    statistics = []
+
     user_threads = [threading.Thread(target=user_thread, args=(users[id], TEST_LENGTH, train_q[id], weight_q[id], update_q[id], delete_q[id], data_reserves)) for id in range(num_users)]
     for u in user_threads:
         u.start()
 
-    st = threading.Thread(target=server_thread, args=(aggregator, log, TEST_LENGTH, users, train_q, weight_q, update_q, delete_q))
+    st = threading.Thread(target=server_thread, args=(aggregator, log, TEST_LENGTH, users, train_q, weight_q, update_q, delete_q, statistics, data_reserves))
     st.start()
 
     for u in user_threads:
         u.join()
 
     st.join()
+
+    return statistics
 
 def destroy_test():
     global log, aggregator, users
@@ -132,7 +138,7 @@ def run():
 
     for _ in range(num_tests):
         setup_test()
-        run_test()
+        print(run_test())
         destroy_test()
 
         tests += 1

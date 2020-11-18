@@ -218,8 +218,6 @@ class Aggregator:
             user = self.logger.get_user(uid)
             # tell that user to train and give back the weights
             producer_qs[uid].enque((user.train, t_round, previous_global_checkpoint))
-        # wait for the users to train on their data
-        time.sleep(TRAIN_TIME)
         # begin retreiving user weights from the users
         received = 0
         loss_locals = []
@@ -228,15 +226,21 @@ class Aggregator:
                 user = self.logger.get_user(uid)
                 # the user will place their weights in their producer queue, so
                 # try to deque from that queue if it isn't empty
-                output, localLoss = consumer_qs[uid].deque()
-                loss_locals.append(deepcopy(localLoss))
+                output = consumer_qs[uid].deque()
                 if output is not None:
-                    # update to the weights_returned
                     print("Aggregator received weight from user " + str(uid))
+                    # parse the result
+                    output, localLoss = output
+                    loss_locals.append(deepcopy(localLoss))
+                    # update to the weights_returned
                     weights_returned[uid] = deepcopy(output)
                     received += 1
+            if received == 0:
+                # wait for the users to train on their data
+                time.sleep(TRAIN_TIME)
+
         loss_avg = sum(loss_locals)/len(loss_locals)
-        print('Round {:3d}, Average loss {:.3f}'.format(rid, loss_avg))
+        # print('Round {:3d}, Average loss {:.3f}'.format(rid, loss_avg))
         # get the aggregator and the last checkpoint
         aggregation_f = t_round.get_aggregation_function()
         # call aggregation_f to get the global weight updates and the weight updates function to send back to devices
