@@ -17,7 +17,7 @@ import random
 import sys
 import threading
 
-TEST_LENGTH = 1
+TEST_LENGTH = 300
 
 try:
     num_tests        = int(sys.argv[1])
@@ -138,6 +138,7 @@ def run():
 
     for _ in range(num_tests):
         setup_test()
+        print("Printing test summary: ")
         print(run_test())
         destroy_test()
 

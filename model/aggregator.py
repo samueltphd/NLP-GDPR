@@ -6,7 +6,7 @@ from copy import deepcopy
 NO_COMPLIANCE, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3
 DELETE, UPDATE = "DELETE", "UPDATE"
 
-TRAIN_TIME = 30
+TRAIN_TIME = 180
 
 # SHALLOW DELETION/UPDATES: NEUTRAL
 # BADGE DELETION/UPDATES: STRONG
@@ -219,9 +219,10 @@ class Aggregator:
             # tell that user to train and give back the weights
             producer_qs[uid].enque((user.train, t_round, previous_global_checkpoint))
         # begin retreiving user weights from the users
+        start = time.time()
         received = 0
         loss_locals = []
-        while received < len(selected_users):
+        while received < len(selected_users) and time.time() - start < 4 * TRAIN_TIME:
             for uid in selected_users:
                 user = self.logger.get_user(uid)
                 # the user will place their weights in their producer queue, so
@@ -238,7 +239,8 @@ class Aggregator:
             if received == 0:
                 # wait for the users to train on their data
                 time.sleep(TRAIN_TIME)
-
+        if len(loss_locals) == 0:
+            return False
         loss_avg = sum(loss_locals)/len(loss_locals)
         # print('Round {:3d}, Average loss {:.3f}'.format(rid, loss_avg))
         # get the aggregator and the last checkpoint

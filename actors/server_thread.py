@@ -31,7 +31,7 @@ def handle_update(x, i):
 def handle_delete(x, i):
     pass
 
-def server_thread(aggregator, log, num_rounds, users, train_qs, weight_qs, update_qs, delete_qs, statistics, data_reserves, train_pct=10, mode=0):
+def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_qs, delete_qs, statistics, data_reserves, train_pct=10, mode=0):
     """
     Workflow: (1) Create and run a round... entails asking users to train and
                   retrieving the result
@@ -41,7 +41,7 @@ def server_thread(aggregator, log, num_rounds, users, train_qs, weight_qs, updat
     global TRAIN_TIME
     start = time.time()
     print("Starting server thread at: " + str(start))
-    print("[server thread] running simulation for " + str(num_rounds) + " iterations")
+    print("[server thread] running simulation for " + str(_tlength) + " seconds")
 
     # initialize global weights of round -1 to be random
     # log.set_global_checkpoint(-1, np.array([random.randint(1, 10) for _ in range(DIMENSION)]))
@@ -52,7 +52,7 @@ def server_thread(aggregator, log, num_rounds, users, train_qs, weight_qs, updat
     log.set_global_checkpoint(-1, net_glob)
 
     rid = 0
-    for _ in range(num_rounds):
+    while time.time() - start < _tlength:
         print("[server thread] Starting round " + str(rid) + " at time: " + str(time.time() - start))
         # determine number of users to participate in the next round
         r = random.randrange(1, len(users) + 1)
@@ -68,7 +68,8 @@ def server_thread(aggregator, log, num_rounds, users, train_qs, weight_qs, updat
 
         # tell aggregator to make users train on data
         print("[server thread] calling on users to train...")
-        aggregator.basic_train(new_round, train_qs, weight_qs)
+        if not aggregator.basic_train(new_round, train_qs, weight_qs):
+            continue
 
         # TODO: handle user requests to updates and deletes => update logger
         for i in range(len(users)):
