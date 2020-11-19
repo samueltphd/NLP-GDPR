@@ -1,7 +1,9 @@
-from model.mnist import federatedSGD, CNNMnist, MLP
+from model.mnist import federatedSGD, MLP
 from model.mnist import localTrainingFederatedSGD
 from model.round import Round
 from model.consts import MNIST
+
+from torch import nn
 
 import numpy as np
 
@@ -18,7 +20,7 @@ DIMENSION  = 28 * 28
 def afunc(uid_to_weights, prev_weights):
     return federatedSGD(uid_to_weights, prev_weights)
 
-def dfunc(_input, data_pct=1):
+def dfunc(_input, data_pct=0.25):
     random.shuffle(_input)
     return _input[:int(len(_input) * data_pct)]
 
@@ -45,7 +47,6 @@ def server_thread(aggregator, log, num_rounds, users, train_qs, weight_qs, updat
 
     # initialize global weights of round -1 to be random
     # log.set_global_checkpoint(-1, np.array([random.randint(1, 10) for _ in range(DIMENSION)]))
-    # net_glob = CNNMnist().to(MNIST['device'])
     net_glob = MLP(dim_in=784, dim_hidden=200, dim_out=MNIST["num_classes"]).to(MNIST["device"])
 
     net_glob.train()
@@ -89,24 +90,39 @@ def server_thread(aggregator, log, num_rounds, users, train_qs, weight_qs, updat
 
         samples = data_reserves.sample(n = len(data_reserves) // 4)
 
+        # for index, x in samples.iterrows():
+        #     model = log.get_global_checkpoint(rid)
+
+        #     val = torch.tensor([[x['body'].tolist()]]).float()
+
+        #     y_pred = model(val).detach().numpy()
+        #     y_pred = [abs(x) for x in y_pred[0]]
+
+        #     if index % 1000 == 0:
+        #         print("Predicted values:", y_pred)
+
+        #     prediction = y_pred.index(max(y_pred))
+        #     actual = x['target']
+
+        #     round_stats["guesses"] += 1
+        #     round_stats["correct"] += 1 if prediction == actual else 0
+        #     round_stats["guess_to_actual"][str(prediction)][actual] += 1
+        images, labels = [], []
         for index, x in samples.iterrows():
-            model = log.get_global_checkpoint(rid)
+            images.append([x['body']])
+            labels.append(x['target'])
+        images, labels = torch.tensor(images).float(), torch.tensor(labels)
+        model = log.get_global_checkpoint(rid)
+        predictions_probs = model(images)
+        print(predictions_probs)
+        print("Finished predicting, now calculating the actual value")
+        prediction = [k.tolist().index(max(k)) for k in predictions_probs]
+        print(prediction)
+        loss_f = nn.CrossEntropyLoss()
+        loss = loss_f(predictions_probs, labels).item()
+        print(loss)
 
-            val = torch.tensor([[x['body'].tolist()]]).float()
-
-            y_pred = model(val).detach().numpy()
-            y_pred = [abs(x) for x in y_pred[0]]
-
-            if index % 1000 == 0:
-                print("Predicted values:", y_pred)
-
-            prediction = y_pred.index(max(y_pred))
-            actual = x['target']
-
-            round_stats["guesses"] += 1
-            round_stats["correct"] += 1 if prediction == actual else 0
-            round_stats["guess_to_actual"][str(prediction)][actual] += 1
-
+        print("Round stats: ", round_stats)
         statistics.append(round_stats)
         rid += 1
 

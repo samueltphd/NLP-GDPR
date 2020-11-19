@@ -17,7 +17,11 @@ import random
 import sys
 import threading
 
-TEST_LENGTH = 1
+# trying out with new mnist dataset
+from torchvision import datasets, transforms
+
+
+TEST_LENGTH = 600
 
 try:
     num_tests        = int(sys.argv[1])
@@ -32,7 +36,13 @@ except Exception:
 
 # data = pd.read_csv("reddit_data.csv")
 # data = pd.read_csv("dummy.csv", index_col=False)
-(xtrain, ytrain), (xtest, ytest) = mnist.load_data()
+# (xtrain, ytrain), (xtest, ytest) = mnist.load_data()
+trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
+dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)
+xtrain, ytrain, xtest, ytest = dataset_train.data.tolist(), dataset_train.targets.tolist(), dataset_test.data.tolist(), dataset_test.targets.tolist()
+
+
 data = pd.DataFrame(columns=['id','body','target'], data=[[random.randint(1,100), x, y] for x, y in zip(xtrain, ytrain)])
 
 def update_id(x):
