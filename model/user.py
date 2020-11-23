@@ -111,11 +111,13 @@ class User:
 
     def request_aggregator_update(self):
         # from the uncommitted, get the relevant round ids
-        self.aggregator.user_request_update(self.uid, self.uncommitted_delete, requestType=DELETE)
-        self.uncommitted_delete = []
-        # and then after the aggregator has successfully done this, we'll clear uncommitted
-        self.aggregator.user_request_update(self.uid, self.uncommitted_update, requestType=UPDATE)
-        self.uncommitted_update = []
+        # self.aggregator.user_request_update(self.uid, self.uncommitted_delete, request_type=DELETE)
+        # self.uncommitted_delete = []
+        # # and then after the aggregator has successfully done this, we'll clear uncommitted
+        # self.aggregator.user_request_update(self.uid, self.uncommitted_update, request_type=UPDATE)
+        # self.uncommitted_update = []
+        self.aggregator.urm.add_request([(True, self.uid, v) for v in self.uncommitted_delete])
+
 
 
 

@@ -17,7 +17,8 @@ import random
 import sys
 import threading
 
-TEST_LENGTH = 300
+# trying out with new mnist dataset
+from torchvision import datasets, transforms
 
 try:
     num_tests        = int(sys.argv[1])
@@ -32,7 +33,13 @@ except Exception:
 
 # data = pd.read_csv("reddit_data.csv")
 # data = pd.read_csv("dummy.csv", index_col=False)
-(xtrain, ytrain), (xtest, ytest) = mnist.load_data()
+# (xtrain, ytrain), (xtest, ytest) = mnist.load_data()
+trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
+dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)
+xtrain, ytrain, xtest, ytest = dataset_train.data.tolist(), dataset_train.targets.tolist(), dataset_test.data.tolist(), dataset_test.targets.tolist()
+
+
 data = pd.DataFrame(columns=['id','body','target'], data=[[random.randint(1,100), x, y] for x, y in zip(xtrain, ytrain)])
 
 def update_id(x):
@@ -58,7 +65,7 @@ def initialize_log():
     log = Log()
 
 def initialize_aggregator():
-    global log, aggregator
+    global log, aggregator, mode
 
     aggregator = Aggregator(log, mode)
 
@@ -95,34 +102,38 @@ def setup_test():
         all_posts = data.loc[data['id'] == uid]
         sample_posts = all_posts.sample(n = len(all_posts) // 2)
 
+        i = 0
         for index, x in sample_posts.iterrows():
-            u.add_data({'id': index, 'val': x['body'], 'target': x['target']})
+            u.add_data({'id': i, 'val': x['body'], 'target': x['target']})
+            i += 1
 
     print("All data flushed!")
 
 def run_test():
-    global log, aggregator, users, TEST_LENGTH, data_reserves
+    global log, aggregator, users, data_reserves, pct_delete, pct_update
 
     print("Running test...")
 
     train_q  = [PCQueue() for _ in range(num_users)]
     weight_q = [PCQueue() for _ in range(num_users)]
-    update_q = [PCQueue() for _ in range(num_users)]
-    delete_q = [PCQueue() for _ in range(num_users)]
+    stop_q   = [PCQueue() for _ in range(num_users)]
 
     statistics = []
 
-    user_threads = [threading.Thread(target=user_thread, args=(users[id], TEST_LENGTH, train_q[id], weight_q[id], update_q[id], delete_q[id], data_reserves)) for id in range(num_users)]
+    user_threads = [threading.Thread(target=user_thread, args=(users[id], log, train_q[id], weight_q[id], stop_q[id], data_reserves, pct_delete, pct_update)) for id in range(num_users)]
     for u in user_threads:
         u.start()
 
-    st = threading.Thread(target=server_thread, args=(aggregator, log, TEST_LENGTH, users, train_q, weight_q, update_q, delete_q, statistics, data_reserves))
+    st = threading.Thread(target=server_thread, args=(aggregator, log, users, train_q, weight_q, statistics, xtest, ytest))
     st.start()
+
+    st.join()
+
+    for q in stop_q:
+        q.enque(True)
 
     for u in user_threads:
         u.join()
-
-    st.join()
 
     return statistics
 
@@ -136,13 +147,15 @@ def destroy_test():
 def run():
     global num_tests, tests
 
+    results = []
     for _ in range(num_tests):
         setup_test()
-        print("Printing test summary: ")
-        print(run_test())
+        results.append(run_test())
         destroy_test()
 
         tests += 1
+
+    return results
 
 
 def main():
@@ -151,11 +164,20 @@ def main():
     if len(sys.argv) < 7 or len(sys.argv) > 7:
         print("python3 tester.py <num_tests> <num_users> <pct_gdpr_users> <pct_delete> <pct_update> <compliance_mode>")
         exit(1)
-    run()
 
-    print("Total Tests:      " + str(tests))
-    print("Total Deletions:  " + str(deletes))
-    print("Total Updates:    " + str(updates))
+    results = run()
+
+    f = open("-".join(sys.argv[2:]) + ".csv", "w")
+    f.write("round,guesses,correct," + ",".join([",".join([str(x) + "-to-" + str(y) for y in range(10)]) for x in range(10)]) + '\n')
+
+    for test in results:
+        for r in test:
+            tokens = ','.join([','.join([str(x) for x in r['guess_to_actual'][str(i)]]) for i in range(10)])
+            f.write(str(r['round']) + ',' + str(r['guesses']) + ',' + str(r['correct']) + ',' + tokens + '\n')
+
+    f.close()
+
+    print("Test complete. Exiting.")
 
 if __name__ == "__main__":
     main()

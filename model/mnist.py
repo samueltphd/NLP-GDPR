@@ -67,40 +67,32 @@ def localTrainingFederatedSGD(data, global_weights):
 
 ############################# DEEP LEARNING STUFF - UNFINISHED #############################
 
-
-class CNNMnist(nn.Module):
-    def __init__(self, args=MNIST):
-        super(CNNMnist, self).__init__()
-        self.conv1 = nn.Conv2d(MNIST['num_channels'], 10, kernel_size=5)
-        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
-        self.conv2_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(320, 50)
-        self.fc2 = nn.Linear(50, MNIST['num_classes'])
-
-    def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = x.view(-1, x.shape[1]*x.shape[2]*x.shape[3])
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, training=self.training)
-        x = self.fc2(x)
-        return x
-
-
 class MLP(nn.Module):
     def __init__(self, dim_in, dim_hidden, dim_out):
         super(MLP, self).__init__()
-        self.layer_input = nn.Linear(dim_in, dim_hidden)
-        self.relu = nn.ReLU()
-        self.dropout = nn.Dropout()
-        self.layer_hidden = nn.Linear(dim_hidden, dim_out)
+        self.conv1 = nn.Conv2d(1, 1, 5)
+        self.fc1 = nn.Linear(576, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
+        # self.layer_input = nn.Linear(dim_in, dim_hidden) # [784, 200]
+        # self.relu = nn.ReLU()
+        # self.dropout = nn.Dropout()
+        # self.layer_hidden = nn.Linear(dim_hidden, dim_out) # [200, 10]
 
-    def forward(self, x):
-        x = x.view(-1, x.shape[1]*x.shape[-2]*x.shape[-1])
-        x = self.layer_input(x)
-        x = self.dropout(x)
-        x = self.relu(x)
-        x = self.layer_hidden(x)
+    def forward(self, x): #x: [10, 1, 28, 28]
+        x = F.relu(self.conv1(x))
+        x = x.view(-1, 576)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        # x = x.view(-1, x.shape[1]*x.shape[-2]*x.shape[-1]) # x: [10, 784]
+        # x = self.layer_input(x) # 10,
+        # x = self.dropout(x)
+        # x = self.relu(x)
+        # x = self.layer_hidden(x)
+        # print("RETURNING x[0]: ", x[0])
+        # print("RETURNING x[1]: ", x[1])
+        # print("RETURNING x[2]: ", x[2])
         return x
 
 
@@ -112,11 +104,11 @@ class LocalUpdate(object):
         # dataset here has to be a zip of sample and data point - it shall not be torch yet and we convert them to torch
         # constructing batches
         batches = []
-
         for index in range(0, len(dataset[0]), self.args['local_bs']):
             ending_index = min(index+self.args['local_bs'], len(dataset[0]))
-            batch = torch.tensor(dataset[0][index:ending_index]).float(),torch.tensor(dataset[1][index:ending_index]).long()
-            batches.append(batch)
+            b1 = torch.tensor(dataset[0][index:ending_index], dtype=torch.float32)
+            b2 = torch.tensor(dataset[1][index:ending_index]).long()
+            batches.append((b1, b2))
         self.ldr_train = batches
 
     # net here is the same as the global neural net at that level, the state dict basically
@@ -126,17 +118,18 @@ class LocalUpdate(object):
         optimizer = torch.optim.SGD(net.parameters(), lr=self.args['lr'], momentum=self.args['momentum'])
         epoch_loss = []
         for iter in range(self.args['local_ep']):
-            # print("Iteration:", iter)
+            print("Iteration:", iter)
             batch_loss = []
             for batch_idx, (images, labels) in enumerate(self.ldr_train):
-                # print("self.dataset_len: ", self.dataset_len)
-                # print("batch size: ", len(self.ldr_train))
-                # print("len(images): ", len(images))
-                # print("images.shape[0]: ", images.shape[0])
                 images, labels = images.to(self.args['device']), labels.to(self.args['device'])
-                net.zero_grad()
+                optimizer.zero_grad()
                 log_probs = net(images)
                 loss = self.loss_func(log_probs, labels)
+                prediction = [k.tolist().index(max(k)) for k in log_probs]
+                # print("labels deeleemug: ", labels)
+                # print("predictions deleemug: ", prediction)
+                # print("loss: ", loss.item())
+                # print("\n\n\n\n\n\n\n")
                 loss.backward()
                 optimizer.step()
                 # if self.args['verbose'] and batch_idx % 10 == 0:
@@ -145,5 +138,6 @@ class LocalUpdate(object):
                     #            100. * batch_idx / len(images), loss.item()))
                 batch_loss.append(loss.item())
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
+        # print('WE HUGE DONE \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n')
         # print("returning: ", net.state_dict(), sum(epoch_loss) / len(epoch_loss))
         return net.state_dict(), sum(epoch_loss) / len(epoch_loss)

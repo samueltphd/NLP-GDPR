@@ -1,7 +1,9 @@
-from model.mnist import federatedSGD, CNNMnist, MLP
+from model.mnist import federatedSGD, MLP
 from model.mnist import localTrainingFederatedSGD
 from model.round import Round
 from model.consts import MNIST
+
+from torch import nn
 
 import numpy as np
 
@@ -18,9 +20,10 @@ DIMENSION  = 28 * 28
 def afunc(uid_to_weights, prev_weights):
     return federatedSGD(uid_to_weights, prev_weights)
 
-def dfunc(_input, data_pct=1):
-    random.shuffle(_input)
-    return _input[:int(len(_input) * data_pct)]
+def dfunc(_input, data_pct=0.25):
+    lst = _input[:]
+    random.shuffle(lst)
+    return lst[:int(len(lst) * data_pct)]
 
 def tfunc(t_data, global_weights):
     return localTrainingFederatedSGD(t_data, global_weights)
@@ -31,7 +34,7 @@ def handle_update(x, i):
 def handle_delete(x, i):
     pass
 
-def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_qs, delete_qs, statistics, data_reserves, train_pct=10, mode=0):
+def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest, ytest, train_pct=10, mode=0):
     """
     Workflow: (1) Create and run a round... entails asking users to train and
                   retrieving the result
@@ -41,18 +44,16 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
     global TRAIN_TIME
     start = time.time()
     print("Starting server thread at: " + str(start))
-    print("[server thread] running simulation for " + str(_tlength) + " seconds")
 
     # initialize global weights of round -1 to be random
     # log.set_global_checkpoint(-1, np.array([random.randint(1, 10) for _ in range(DIMENSION)]))
-    # net_glob = CNNMnist().to(MNIST['device'])
     net_glob = MLP(dim_in=784, dim_hidden=200, dim_out=MNIST["num_classes"]).to(MNIST["device"])
 
     net_glob.train()
     log.set_global_checkpoint(-1, net_glob)
 
     rid = 0
-    while time.time() - start < _tlength:
+    for _ in range(len(users)):
         print("[server thread] Starting round " + str(rid) + " at time: " + str(time.time() - start))
         # determine number of users to participate in the next round
         r = random.randrange(1, len(users) + 1)
@@ -60,9 +61,9 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
         # set up the round
         new_round = Round(
             rid,                    # round id
-            tfunc,                  # training function   => placeholder
+            tfunc,                  # training function
             dfunc,                  # data function
-            afunc,                  # aggregator function => placeholder
+            afunc,                  # aggregator function
             r                       # number of participating devices
         )
 
@@ -71,44 +72,40 @@ def server_thread(aggregator, log, _tlength, users, train_qs, weight_qs, update_
         if not aggregator.basic_train(new_round, train_qs, weight_qs):
             continue
 
-        # TODO: handle user requests to updates and deletes => update logger
-        for i in range(len(users)):
-            _update = update_qs[i].deque()
-            _delete = delete_qs[i].deque()
-
-            if _update is not None:
-                # handle update
-                handle_update(_update, i)
-
-            if _delete is not None:
-                # handle delete
-                handle_delete(_delete, i)
-
         print("[server thread] computing accuracy on most recent global weights")
 
         round_stats = {"guesses": 0, "correct": 0, "guess_to_actual":{str(i): [0 for _ in range(10)] for i in range(10)}}
+        round_stats["round"] = rid
 
-        samples = data_reserves.sample(n = len(data_reserves) // 4)
+        indices = random.sample(list(range(len(xtest))), len(xtest) // 4)
 
-        for index, x in samples.iterrows():
-            model = log.get_global_checkpoint(rid)
+        images, labels = [], []
+        for i in indices:
+            images.append([xtest[i]])
+            labels.append(ytest[i])
+        images, labels = torch.tensor(images).float(), torch.tensor(labels)
+        model = log.get_global_checkpoint(rid)
+        predictions_probs = model(images)
+        print("[server thread] Finished predicting, now calculating the actual value")
+        prediction = [k.tolist().index(max(k)) for k in predictions_probs]
+        loss_f = nn.CrossEntropyLoss()
+        loss = loss_f(predictions_probs, labels).item()
 
-            val = torch.tensor([[x['body'].tolist()]]).float()
-
-            y_pred = model(val).detach().numpy()
-            y_pred = [abs(x) for x in y_pred[0]]
-
-            if index % 1000 == 0:
-                print("Predicted values:", y_pred)
-
-            prediction = y_pred.index(max(y_pred))
-            actual = x['target']
-
+        for pred, act in zip(prediction, labels):
             round_stats["guesses"] += 1
-            round_stats["correct"] += 1 if prediction == actual else 0
-            round_stats["guess_to_actual"][str(prediction)][actual] += 1
+            round_stats["correct"] += 1 if pred == act else 0
+            round_stats["guess_to_actual"][str(pred)][act] += 1
 
+        print("Round stats: ", round_stats)
         statistics.append(round_stats)
+
+
+        print("[server thread] handling user update requests...")
+        aggregator.urm.handle_requests()
+
         rid += 1
+
+    print("[server thread] handling user update requests...")
+    aggregator.urm.handle_requests(batch_size=0)
 
     return statistics

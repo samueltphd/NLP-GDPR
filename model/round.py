@@ -32,6 +32,7 @@ class Round:
         #           the current set of weights from the user, and update it to be something)
         #           +-+-+ weight function: a function that takes in a previous set of weights and output a novel set of weights
         self.aggregation_function = aggregation_function
+        self.epochs = 3
 
 
     def get_training_function(self):
@@ -52,3 +53,6 @@ class Round:
 
     def get_num_participants(self):
         return self.num_participants
+
+    def get_epochs(self):
+        return self.epochs

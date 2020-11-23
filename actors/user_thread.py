@@ -1,16 +1,14 @@
 import random
 import time
 
-update_pct = 30
-delete_pct = 30
-
-def user_thread(obj, _tlength, train_q, weight_q, update_q, delete_q, data_reserves):
-    global update_pct, delete_pct
-
+def user_thread(obj, log, train_q, weight_q, stop_q, data_reserves, delete_pct, update_pct):
     start = time.time()
     print("Starting user thread at: " + str(start))
 
-    while time.time() - start < _tlength:
+    while True:
+        if stop_q.deque() is not None:
+            break
+
         # receive training requests from server thread
         trequest = train_q.deque()
 
@@ -24,25 +22,28 @@ def user_thread(obj, _tlength, train_q, weight_q, update_q, delete_q, data_reser
             # send the results back to the aggregator
             weight_q.enque(result)
 
-        # determine any requests to be made
-        # if so send request to aggregator to update logger
-        """
-        r = random.randint(1, 100)
+            # determine any requests to be made
+            # if so send request to aggregator to update logger
+            count = 0
+            for _ in range(100):
+                r = random.randrange(100)
+                i = random.randrange(len(obj.data))
 
-        if r < update_pct:
-            new_data = data_reserves.sample()['body']
-            if len(obj.data) > 0:
-                to_update = random.choice(obj.data)
+                if r < delete_pct:
+                    obj.change_data_permission(i)
+                    obj.request_aggregator_update()
+                    count += 1
+                elif r < delete_pct + update_pct:
+                    to_update = obj.data_id_to_data_point[i]
+                    to_update['val'] = data_reserves.sample()['body'].values[0]
+                    obj.update_data(i, to_update)
+                    count += 1
+                else:
+                    d = data_reserves.sample()
+                    obj.add_data({'id': len(obj.data), 'val': d['body'].values[0], 'target': d['target'].values[0]})
 
-                obj.update_data(to_update['id'], {'id': to_update['id'],
-                 'val': new_data,
-                 'rids': to_update['rids'] if 'rids' in to_update.keys() else [],
-                 'opt_in': to_update['opt_in']
-                 })
+            print("[user thread " + str(obj.uid) + "] requested the aggregator to update " + str(count) + " times...")
 
-        elif r < update_pct + delete_pct:
-            if len(obj.data) > 0:
-                to_remove = random.choice(obj.data)
+            time.sleep(5)
 
-                obj.remove_data(to_remove['id'])
-        """
+    print("[user thread " + str(obj.uid) + "] exiting...")
