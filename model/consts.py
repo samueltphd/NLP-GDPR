@@ -26,6 +26,13 @@ MNIST = {
     'seed': 1
 }
 
+INCOME = {
+    'lr': 0.01,
+    'bs': 10,
+    'num_users': 20,
+    'epochs': 10
+}
+
 MNIST['device'] = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
 
 def args_parser():
