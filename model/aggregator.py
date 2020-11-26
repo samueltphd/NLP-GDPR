@@ -1,21 +1,21 @@
 import threading
 import time
 from copy import deepcopy
+import math
 
 # different modes of GDPR compliance
 NO_COMPLIANCE, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3
 DELETE, UPDATE = "DELETE", "UPDATE"
 
-TRAIN_TIME = 30
-
 # SHALLOW DELETION/UPDATES: NEUTRAL
 # BADGE DELETION/UPDATES: STRONG
 # ONE USER AT A TIME DELETION/UPDATES: STRICT
 class UserRequestManager:
-    def __init__(self, agg):
+    def __init__(self, agg, compliance_mode):
         self.agg = agg
         self.values = []
         self.lock = threading.Lock()
+        self.compliance_mode = compliance_mode
 
     def add_request(self, value):
         self.lock.acquire()
@@ -23,22 +23,34 @@ class UserRequestManager:
             self.values.append(v)
         self.lock.release()
 
-    def handle_requests(self, batch_size=1000):
+    def handle_requests(self):
+        batch_size = 0
+
+        if compliance_mode == 0:
+            batch_size = math.inf
+        else if compliance_mode == 1:
+            batch_size = 10000
+        else if compliance_mode == 2:
+            batch_size = 100
+
         self.lock.acquire()
         if len(self.values) < batch_size:
             self.lock.release()
-            return
+            return False
         else:
             for v in self.values:
                 self.agg.user_request_update(v[1], v[2])
             self.lock.release()
+            return True
 
 class Aggregator:
-    def __init__(self, logger, compliance_mode=NO_COMPLIANCE, badge_limit=10):
+    def __init__(self, logger, compliance_mode=NO_COMPLIANCE, badge_limit=0):
         self.logger = logger
         self.compliance_mode = compliance_mode
         self.lock = threading.Lock()
-        self.urm = UserRequestManager(self)
+        self.urm = UserRequestManager(self, compliance_mode)
+        self.producer_qs = None
+        self.consumer_qs = None
         if compliance_mode == STRONG:
             # data structure to map from id (int) to list of (round, request_type)
             self.to_updates = {}
@@ -59,13 +71,21 @@ class Aggregator:
             for rid in rids:
                 # if type == DELETE or UPDATE, both has to go through this
                 self.logger.delete_round_participated(uid, rid)
+
                 if request_type == UPDATE:
                     # get the round
                     t_round = self.logger.get_round(rid)
                     # get the user
                     user = self.logger.get_user(uid)
                     # get the output from training
-                    output, localLoss = user.train(t_round, self.logger.get_global_checkpoint(rid))
+                    self.producer_qs[uid].enque((user.train, t_round, self.logger.get_global_checkpoint(rid)))
+
+                    result = self.consumer_qs[uid].deque()
+                    while result == None:
+                        time.sleep(3)
+                        result = self.consumer_qs[uid].deque()
+
+                    output, localLoss = result
                     # update the state
                     self.logger.log_round_participated(uid, rid, output)
                     # dont do anything with local loss since we are not retraining again
@@ -123,7 +143,14 @@ class Aggregator:
                 # get the round
                 t_round = self.logger.get_round(rid)
                 # get the output from training
-                output, localLoss = user.train(t_round, self.logger.get_global_checkpoint(rid))
+                self.producer_qs[uid].enque((user.train, t_round, self.logger.get_global_checkpoint(rid)))
+
+                result = self.consumer_qs[uid].deque()
+                while result == None:
+                    time.sleep(3)
+                    result = self.consumer_qs[uid].deque()
+
+                output, localLoss = result
                 # if there is at least some user that requested their participation to
                 # be deleted from this round
                 if rid in rid_to_uids_delete: excluding = rid_to_uids_delete[rid]
@@ -136,7 +163,14 @@ class Aggregator:
                     loss_locals = []
                     for uid in rid_to_uids_update[rid]:
                         # we will get the output from training on that user device
-                        output, localLoss = user.train(t_round, self.logger.get_global_checkpoint(rid))
+                        self.producer_qs[uid].enque((user.train, t_round, self.logger.get_global_checkpoint(rid)))
+
+                        result = self.consumer_qs[uid].deque()
+                        while result == None:
+                            time.sleep(3)
+                            result = self.consumer_qs[uid].deque()
+
+                        output, localLoss = result
                         print("Local loss: ", localLoss)
                         # update the new_weights to reflect the (potentially) new contribution
                         # from this uid
@@ -186,7 +220,14 @@ class Aggregator:
                 # get the round
                 t_round = self.logger.get_round(rid)
                 # get the output from training
-                output, localLoss = user.train(t_round, self.logger.get_global_checkpoint(rid))
+                self.producer_qs[uid].enque((user.train, t_round, self.logger.get_global_checkpoint(rid)))
+
+                result = self.consumer_qs[uid].deque()
+                while result == None:
+                    time.sleep(3)
+                    result = self.consumer_qs[uid].deque()
+
+                output, localLoss = result
                 # # get the weight contributed by this uid to this rid in the past
                 # old_weight = self.logger.get_weight_contributed_by_device(uid, rid)
                 # # if the old_weight contributed by the device is the same as the new weight contribution, it
@@ -233,11 +274,13 @@ class Aggregator:
         - Select randomly num_participants users to train stuff
         - For each of these, call the train() function on each user's device
         """
+        self.producer_qs = producer_qs
+        self.consumer_qs = consumer_qs
         # get the training function and the data selection function for each user
         # try:
         rid = t_round.get_round_id()
         # for ep in range(t_round.get_epochs()):
-        for ep in range(1):
+        for ep in range(20):
             print("Epoch: ", ep)
             if ep == 0: previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
             else: previous_global_checkpoint = self.logger.get_global_checkpoint(rid)

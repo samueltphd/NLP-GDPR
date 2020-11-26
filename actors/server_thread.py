@@ -38,10 +38,9 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
     """
     Workflow: (1) Create and run a round... entails asking users to train and
                   retrieving the result
-              (2) Update teh global model with user weights
+              (2) Update the global model with user weights
               (3) Receive user requests for updates and deletes and handle them
     """
-    global TRAIN_TIME
     start = time.time()
     print("Starting server thread at: " + str(start))
 
@@ -72,6 +71,9 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
         if not aggregator.basic_train(new_round, train_qs, weight_qs):
             continue
 
+        print("[server thread] handling user update requests...")
+        handled = aggregator.urm.handle_requests()
+
         print("[server thread] computing accuracy on most recent global weights")
 
         round_stats = {"guesses": 0, "correct": 0, "guess_to_actual":{str(i): [0 for _ in range(10)] for i in range(10)}}
@@ -96,16 +98,16 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
             round_stats["correct"] += 1 if pred == act else 0
             round_stats["guess_to_actual"][str(pred)][act] += 1
 
+        round['time'] = time.time() - start
+
+        if handled:
+            round_stats['requests_handled'] = 1
+        else:
+            round_stats['requests_handled'] = 0
+
         print("Round stats: ", round_stats)
         statistics.append(round_stats)
 
-
-        print("[server thread] handling user update requests...")
-        aggregator.urm.handle_requests()
-
         rid += 1
-
-    print("[server thread] handling user update requests...")
-    aggregator.urm.handle_requests(batch_size=0)
 
     return statistics

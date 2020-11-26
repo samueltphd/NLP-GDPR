@@ -168,13 +168,12 @@ def main():
     results = run()
 
     f = open("-".join(sys.argv[2:]) + ".csv", "w")
-    f.write("round,guesses,correct," + ",".join([",".join([str(x) + "-to-" + str(y) for y in range(10)]) for x in range(10)]) + '\n')
+    f.write("round,time,requests_handled,guesses,correct," + ",".join([",".join([str(x) + "-to-" + str(y) for y in range(10)]) for x in range(10)]) + '\n')
 
     for test in results:
         for r in test:
             tokens = ','.join([','.join([str(x) for x in r['guess_to_actual'][str(i)]]) for i in range(10)])
-            f.write(str(r['round']) + ',' + str(r['guesses']) + ',' + str(r['correct']) + ',' + tokens + '\n')
-
+            f.write(str(r['round']) + ',' + str(r['time']) + ',' + str(r['requests_handled']) + ',' + str(r['guesses']) + ',' + str(r['correct']) + ',' + tokens + '\n')
     f.close()
 
     print("Test complete. Exiting.")
