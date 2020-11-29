@@ -1,7 +1,7 @@
 import random
 import time
 
-def user_thread(obj, log, train_q, weight_q, stop_q, data_reserves, delete_pct, update_pct):
+def user_thread(obj, agg, log, train_q, weight_q, stop_q, data_reserves, delete_pct, update_pct):
     start = time.time()
     print("Starting user thread at: " + str(start))
 
@@ -31,7 +31,7 @@ def user_thread(obj, log, train_q, weight_q, stop_q, data_reserves, delete_pct, 
 
                 if r < delete_pct:
                     obj.change_data_permission(i)
-                    obj.request_aggregator_update()
+                    obj.request_aggregator_update(agg)
                     count += 1
                 elif r < delete_pct + update_pct:
                     to_update = obj.data_id_to_data_point[i]

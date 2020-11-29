@@ -117,7 +117,7 @@ def run_test():
 
     statistics = []
 
-    user_threads = [threading.Thread(target=user_thread, args=(users[id], log, train_q[id], weight_q[id], stop_q[id], data_reserves, pct_delete, pct_update)) for id in range(num_users)]
+    user_threads = [threading.Thread(target=user_thread, args=(users[id], aggregator, log, train_q[id], weight_q[id], stop_q[id], data_reserves, pct_delete, pct_update)) for id in range(num_users)]
     for u in user_threads:
         u.start()
 
