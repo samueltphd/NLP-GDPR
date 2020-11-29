@@ -80,7 +80,7 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
             labels.append(ytest[i])
         samples, labels = np.array(samples).astype(float), np.array(labels)
         model_weights = log.get_global_checkpoint(rid)
-        # and then this part is to create a dummy LocalUpdate 
+        # and then this part is to create a dummy LocalUpdate
         prediction_loss = loss(samples, labels, model_weights)
         print("Loss: ", prediction_loss, ", at round: ", rid)
 
@@ -90,8 +90,6 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
 
         rid += 1
 
-    print("[server thread] handling user update requests...")
-    # aggregator.urm.handle_requests(batch_size=0)
-    aggregator.urm.handle_requests()
+    log.save_logger_model("income-logger.pkl")
 
     return statistics
