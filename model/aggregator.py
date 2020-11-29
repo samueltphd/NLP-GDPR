@@ -26,11 +26,11 @@ class UserRequestManager:
     def handle_requests(self):
         batch_size = 0
 
-        if compliance_mode == 0:
+        if self.compliance_mode == 0:
             batch_size = math.inf
-        elif compliance_mode == 1:
+        elif self.compliance_mode == 1:
             batch_size = 10000
-        elif compliance_mode == 2:
+        elif self.compliance_mode == 2:
             batch_size = 100
 
         self.lock.acquire()
@@ -280,7 +280,7 @@ class Aggregator:
         # try:
         rid = t_round.get_round_id()
         # for ep in range(t_round.get_epochs()):
-        for ep in range(20):
+        for ep in range(1):
             print("Epoch: ", ep)
             if ep == 0: previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
             else: previous_global_checkpoint = self.logger.get_global_checkpoint(rid)

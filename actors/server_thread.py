@@ -98,12 +98,14 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
             round_stats["correct"] += 1 if pred == act else 0
             round_stats["guess_to_actual"][str(pred)][act] += 1
 
-        round['time'] = time.time() - start
+        round_stats['time'] = time.time() - start
 
         if handled:
             round_stats['requests_handled'] = 1
         else:
             round_stats['requests_handled'] = 0
+
+        round_stats['logger_size'] = log.getsize()
 
         print("Round stats: ", round_stats)
         statistics.append(round_stats)
