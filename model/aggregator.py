@@ -1,4 +1,4 @@
-from consts import MNIST
+from model.consts import MNIST
 
 import threading
 import time
