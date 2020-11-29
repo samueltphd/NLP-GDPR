@@ -1,4 +1,5 @@
 import random
+import pickle
 # imports for space complexity
 import sys
 from types import ModuleType, FunctionType
@@ -19,7 +20,7 @@ DELETE, UPDATE = "DELETE", "UPDATE"
 The design of this Logger is so that everything is logged only AFTER the changes have been made - i.e. only log that
 user has been removed from a round when the training has already been updated
 """
-class Log:
+class Log(object):
     def __init__(self):
         self.rounds = {} # rid to round
         self.uid_to_rids = {} # variable to map from uid to id of rounds of training (rids)
@@ -162,4 +163,9 @@ class Log:
             except Exception as e:
                 print("Exception caught at getsize() in logger.py: ", e)
                 continue
-        return total_size    
+        return total_size
+
+
+    def save_logger_model(self, address):
+        with open(address, wb) as output:
+            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
