@@ -14,7 +14,7 @@ import time
 
 import sys
 
-TRAIN_TIME = 1
+TRAIN_TIME = 100
 DIMENSION  = 28 * 28
 
 def afunc(uid_to_weights, prev_weights):
@@ -68,7 +68,7 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
 
         # tell aggregator to make users train on data
         print("[server thread] calling on users to train...")
-        if not aggregator.basic_train(new_round, train_qs, weight_qs):
+        if not aggregator.basic_train(new_round, train_qs, weight_qs, TRAIN_TIME):
             continue
 
         print("[server thread] handling user update requests...")

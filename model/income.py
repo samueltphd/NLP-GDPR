@@ -1,5 +1,7 @@
 import numpy as np
 import random
+from .consts import INCOME
+from sklearn.model_selection import train_test_split
 
 # copy stuff to copy over neural network
 from copy import deepcopy
@@ -32,7 +34,7 @@ def import_census(file_path, addBias=True):
 
 def federatedAveraging(w):
     # make a dummy variable
-    w_cardinality = len(list(w.values()))
+    w_cardinality = len(list(w.values())[0])
     w_avg = np.zeros(w_cardinality)
     for uid in w:
         w_avg += w[uid]
@@ -51,7 +53,7 @@ def federatedSGD(uid_to_weight, prev_weights, C=1, learning_rate=0.01):
     #            +-+-+ weight function: a function that takes in a previous set of weights and output a novel set of weights
     new_global_weight = federatedAveraging(uid_to_weight)
     update_dict = {k: lambda x: new_global_weight for k in uid_to_weight}
-    return new_weights, update_dict
+    return new_global_weight, update_dict
 
 
 def localTrainingFederatedSGD(data, global_weights):
@@ -65,8 +67,8 @@ def localTrainingFederatedSGD(data, global_weights):
     d1, d2 = [], []
     for data_point in data:
         assert type(data_point["val"]) == np.ndarray
-        assert type(data_point["target"]) == np.int64
-        d1.append([data_point["val"]])
+        assert type(data_point["target"]) == np.int64 or type(data_point["target"]) == int
+        d1.append(data_point["val"])
         d2.append(data_point["target"])
     data = (np.array(d1), np.array(d2))
     local = LocalUpdate(INCOME, data)
@@ -107,12 +109,12 @@ class LocalUpdate(object):
         samples, labels = np.array(self.dataset[0], copy=True), np.array(self.dataset[1], copy=True)
         assert len(samples) == len(labels)
         ids = np.arange(len(labels))
-        shuffled_samples, shuffled_labels = samples[ids], shuffled_labels[ids]
+        shuffled_samples, shuffled_labels = samples[ids], labels[ids]
         if not construct_batches:
             self.dataset = (shuffled_samples, shuffled_labels)
             return [(shuffled_samples, shuffled_labels)]
         batches = []
-        for starting_index in range(o, len(labels), self.args['local_bs']):
+        for starting_index in range(0, len(labels), self.args['local_bs']):
             ending_index = min(starting_index + self.args['local_bs'], len(labels))
             b1, b2 = shuffled_samples[starting_index:ending_index], shuffled_labels[starting_index:ending_index]
             batches.append((b1, b2))
@@ -123,17 +125,25 @@ class LocalUpdate(object):
     # net here is the same as the global neural net at that level, the state dict basically
     def train(self, global_weights):
         weights = np.array(global_weights, copy=True)
+        prev_loss, curr_loss = 0, 0
         for iter in range(self.args['local_ep']):
+            prev_loss = curr_loss
+            curr_loss = 0
             batches = self.shuffleData()
             for bid, (samples, labels) in enumerate(batches):
+                assert len(samples) == len(labels)
                 # predictions
                 predictions = np.dot(samples, weights).astype(float)
                 softmaxed = softmax(predictions)
                 assert len(softmaxed) == len(labels)
-                diff = softmaxed - labels
-                gradient = np.divide(np.dot(samples.transpose(), diff), self.args['local_bs'])
+                diff = np.subtract(softmaxed, labels)
+                dotted = np.dot(samples.transpose(), diff)
+                gradient = np.divide(dotted, self.args['local_bs'])
                 # update weights
                 weights = weights - self.args['lr']*gradient
-        training_loss = loss(self.dataset[0], self.dataset[1], weights)
-        print("Training loss: ", training_loss)
-        return weights, training_loss
+            curr_loss = loss(self.dataset[0], self.dataset[1], weights)
+            print("current loss: ", curr_loss)
+            if abs(curr_loss - prev_loss) <= self.args['converge_threshold']:
+                break
+        print("Training loss: ", curr_loss)
+        return weights, curr_loss

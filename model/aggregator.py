@@ -28,9 +28,9 @@ class UserRequestManager:
 
         if compliance_mode == 0:
             batch_size = math.inf
-        else if compliance_mode == 1:
+        elif compliance_mode == 1:
             batch_size = 10000
-        else if compliance_mode == 2:
+        elif compliance_mode == 2:
             batch_size = 100
 
         self.lock.acquire()
@@ -268,7 +268,7 @@ class Aggregator:
         self.lock.release()
 
 
-    def basic_train(self, t_round, producer_qs, consumer_qs):
+    def basic_train(self, t_round, producer_qs, consumer_qs, train_time=1):
         """
         function to do the server's training algorithm as demonstrated in the paper. The list of things that it will do:
         - Select randomly num_participants users to train stuff
@@ -311,7 +311,7 @@ class Aggregator:
                         received += 1
                 if received == 0:
                     # wait for the users to train on their data
-                    time.sleep(TRAIN_TIME)
+                    time.sleep(train_time)
                     for q in producer_qs:
                         if q.deque() is not None:
                             self.logger.set_global_checkpoint(rid, previous_global_checkpoint, replace=True)

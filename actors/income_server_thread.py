@@ -64,7 +64,7 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
 
         # tell aggregator to make users train on data
         print("[server thread] calling on users to train...")
-        if not aggregator.basic_train(new_round, train_qs, weight_qs):
+        if not aggregator.basic_train(new_round, train_qs, weight_qs, TRAIN_TIME):
             continue
 
         print("[server thread] computing accuracy on most recent global weights")
@@ -91,6 +91,7 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
         rid += 1
 
     print("[server thread] handling user update requests...")
-    aggregator.urm.handle_requests(batch_size=0)
+    # aggregator.urm.handle_requests(batch_size=0)
+    aggregator.urm.handle_requests()
 
     return statistics

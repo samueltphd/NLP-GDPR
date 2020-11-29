@@ -74,10 +74,7 @@ class MLP(nn.Module):
         self.fc1 = nn.Linear(576, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
-        # self.layer_input = nn.Linear(dim_in, dim_hidden) # [784, 200]
-        # self.relu = nn.ReLU()
-        # self.dropout = nn.Dropout()
-        # self.layer_hidden = nn.Linear(dim_hidden, dim_out) # [200, 10]
+
 
     def forward(self, x): #x: [10, 1, 28, 28]
         x = F.relu(self.conv1(x))
@@ -85,14 +82,6 @@ class MLP(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
-        # x = x.view(-1, x.shape[1]*x.shape[-2]*x.shape[-1]) # x: [10, 784]
-        # x = self.layer_input(x) # 10,
-        # x = self.dropout(x)
-        # x = self.relu(x)
-        # x = self.layer_hidden(x)
-        # print("RETURNING x[0]: ", x[0])
-        # print("RETURNING x[1]: ", x[1])
-        # print("RETURNING x[2]: ", x[2])
         return x
 
 
@@ -126,10 +115,6 @@ class LocalUpdate(object):
                 log_probs = net(images)
                 loss = self.loss_func(log_probs, labels)
                 prediction = [k.tolist().index(max(k)) for k in log_probs]
-                # print("labels deeleemug: ", labels)
-                # print("predictions deleemug: ", prediction)
-                # print("loss: ", loss.item())
-                # print("\n\n\n\n\n\n\n")
                 loss.backward()
                 optimizer.step()
                 # if self.args['verbose'] and batch_idx % 10 == 0:
@@ -138,6 +123,6 @@ class LocalUpdate(object):
                     #            100. * batch_idx / len(images), loss.item()))
                 batch_loss.append(loss.item())
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
-        # print('WE HUGE DONE \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n')
-        # print("returning: ", net.state_dict(), sum(epoch_loss) / len(epoch_loss))
+            if len(epoch_loss) >= 2 and abs(epoch_loss[-1] - epoch_loss[-2]) <= self.args['converge_threshold']:
+                break
         return net.state_dict(), sum(epoch_loss) / len(epoch_loss)

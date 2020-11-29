@@ -31,9 +31,6 @@ except Exception:
     print("python3 tester.py <num_tests> <num_users> <pct_gdpr_users> <pct_delete> <pct_update> <compliance_mode>")
     exit(1)
 
-# data = pd.read_csv("reddit_data.csv")
-# data = pd.read_csv("dummy.csv", index_col=False)
-# (xtrain, ytrain), (xtest, ytest) = mnist.load_data()
 trans_mnist = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
 dataset_train = datasets.MNIST('../data/mnist/', train=True, download=True, transform=trans_mnist)
 dataset_test = datasets.MNIST('../data/mnist/', train=False, download=True, transform=trans_mnist)

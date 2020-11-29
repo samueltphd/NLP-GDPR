@@ -23,14 +23,18 @@ MNIST = {
     'gpu': 0,
     'stopping_rounds': 10,
     'verbose': True,
-    'seed': 1
+    'seed': 1,
+    'converge_threshold': 0.02
 }
 
 INCOME = {
     'lr': 0.01,
     'bs': 10,
     'num_users': 20,
-    'epochs': 10
+    'epochs': 10,
+    'converge_threshold': 0.02,
+    'local_ep': 5,
+    'local_bs': 10
 }
 
 MNIST['device'] = torch.device('cuda:{}'.format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else 'cpu')
