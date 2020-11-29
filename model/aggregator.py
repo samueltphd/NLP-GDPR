@@ -280,7 +280,7 @@ class Aggregator:
         # try:
         rid = t_round.get_round_id()
         # for ep in range(t_round.get_epochs()):
-        for ep in range(1):
+        for ep in range(100):
             print("Epoch: ", ep)
             if ep == 0: previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
             else: previous_global_checkpoint = self.logger.get_global_checkpoint(rid)
