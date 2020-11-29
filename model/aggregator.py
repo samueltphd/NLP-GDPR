@@ -1,3 +1,5 @@
+from consts import MNIST
+
 import threading
 import time
 from copy import deepcopy
@@ -268,7 +270,7 @@ class Aggregator:
         self.lock.release()
 
 
-    def basic_train(self, t_round, producer_qs, consumer_qs, train_time=1):
+    def basic_train(self, t_round, producer_qs, consumer_qs, train_time=5):
         """
         function to do the server's training algorithm as demonstrated in the paper. The list of things that it will do:
         - Select randomly num_participants users to train stuff
@@ -277,68 +279,60 @@ class Aggregator:
         self.producer_qs = producer_qs
         self.consumer_qs = consumer_qs
         # get the training function and the data selection function for each user
-        # try:
-        rid = t_round.get_round_id()
-        # for ep in range(t_round.get_epochs()):
-        for ep in range(100):
-            print("Epoch: ", ep)
-            if ep == 0: previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
-            else: previous_global_checkpoint = self.logger.get_global_checkpoint(rid)
-            selected_users = self.logger.sample_users(t_round.num_participants)
-            weights_returned = {}
-            for uid in selected_users:
-                user = self.logger.get_user(uid)
-                # tell that user to train and give back the weights
-                producer_qs[uid].enque((user.train, t_round, previous_global_checkpoint))
-                print("Training request sent")
-            # begin retreiving user weights from the users
-            received = 0
-            loss_locals = []
-            while received < len(selected_users):
+        try:
+            rid = t_round.get_round_id()
+            for ep in range(MNIST["epochs"]):
+                print("Epoch: ", ep)
+                if ep == 0: previous_global_checkpoint = self.logger.get_global_checkpoint(rid - 1)
+                else: previous_global_checkpoint = self.logger.get_global_checkpoint(rid)
+                selected_users = self.logger.sample_users(t_round.num_participants)
+                weights_returned = {}
                 for uid in selected_users:
                     user = self.logger.get_user(uid)
-                    # the user will place their weights in their producer queue, so
-                    # try to deque from that queue if it isn't empty
-                    output = consumer_qs[uid].deque()
-                    if output is not None:
-                        print("Aggregator received weight from user " + str(uid))
-                        # parse the result
-                        output, localLoss = output
-                        print("local loss: ", localLoss)
-                        loss_locals.append(deepcopy(localLoss))
-                        # update to the weights_returned
-                        weights_returned[uid] = deepcopy(output)
-                        received += 1
-                if received == 0:
-                    # wait for the users to train on their data
-                    time.sleep(train_time)
-                    for q in producer_qs:
-                        if q.deque() is not None:
-                            self.logger.set_global_checkpoint(rid, previous_global_checkpoint, replace=True)
-                            return False
-            print("Loss locals: ", loss_locals)
-            loss_avg = sum(loss_locals)/len(loss_locals)
-            print('Epoch {:3d}, Round {:3d}, Average loss {:.3f}'.format(ep, rid, loss_avg))
-            # get the aggregator and the last checkpoint
-            aggregation_f = t_round.get_aggregation_function()
-            # call aggregation_f to get the global weight updates and the weight updates function to send back to devices
-            global_weights, uid_to_local_weight_fs = aggregation_f(uid_to_weights=weights_returned, prev_weights=previous_global_checkpoint)
-            # ask users to update the weights
-            for uid_to_locally_update in uid_to_local_weight_fs:
-                # user:
-                user = self.logger.get_user(uid_to_locally_update)
-                # update_function: function that would take in a previous set of weights and output a new set of weights
-                # should handle input=None (in case this is the first training round)
-                update_function = uid_to_local_weight_fs[uid_to_locally_update]
-                # tell the user to update with this update function
-                if user is not None:
-                    user.update_weights(rid-1, rid, update_function)
-            # set the global checkpoint (so the weights, not the updates)
-            self.logger.set_global_checkpoint(rid, global_weights, replace=True)
-            # and then, got hrough each user to update their weight contribution in this round
-            for uid in weights_returned:
-                self.logger.log_round_participated(uid, rid, weights_returned[uid])
-        return True
-        # except Exception as e:
-        #     print("Exception caught: ", e)
-        #     return False
+                    # tell that user to train and give back the weights
+                    producer_qs[uid].enque((user.train, t_round, previous_global_checkpoint))
+                    print("Training request sent")
+                # begin retreiving user weights from the users
+                received = 0
+                loss_locals = []
+                while received < len(selected_users):
+                    for uid in selected_users:
+                        user = self.logger.get_user(uid)
+                        # the user will place their weights in their producer queue, so
+                        # try to deque from that queue if it isn't empty
+                        output = consumer_qs[uid].deque()
+                        if output is not None:
+                            print("Aggregator received weight from user " + str(uid))
+                            # parse the result
+                            output, localLoss = output
+                            print("local loss: ", localLoss)
+                            loss_locals.append(deepcopy(localLoss))
+                            # update to the weights_returned
+                            weights_returned[uid] = deepcopy(output)
+                            received += 1
+                print("Loss locals: ", loss_locals)
+                loss_avg = sum(loss_locals)/len(loss_locals)
+                print('Epoch {:3d}, Round {:3d}, Average loss {:.3f}'.format(ep, rid, loss_avg))
+                # get the aggregator and the last checkpoint
+                aggregation_f = t_round.get_aggregation_function()
+                # call aggregation_f to get the global weight updates and the weight updates function to send back to devices
+                global_weights, uid_to_local_weight_fs = aggregation_f(uid_to_weights=weights_returned, prev_weights=previous_global_checkpoint)
+                # ask users to update the weights
+                for uid_to_locally_update in uid_to_local_weight_fs:
+                    # user:
+                    user = self.logger.get_user(uid_to_locally_update)
+                    # update_function: function that would take in a previous set of weights and output a new set of weights
+                    # should handle input=None (in case this is the first training round)
+                    update_function = uid_to_local_weight_fs[uid_to_locally_update]
+                    # tell the user to update with this update function
+                    if user is not None:
+                        user.update_weights(rid-1, rid, update_function)
+                # set the global checkpoint (so the weights, not the updates)
+                self.logger.set_global_checkpoint(rid, global_weights, replace=True)
+                # and then, got hrough each user to update their weight contribution in this round
+                for uid in weights_returned:
+                    self.logger.log_round_participated(uid, rid, weights_returned[uid])
+            return True
+        except Exception as e:
+            print("Exception caught: ", e)
+            return False
