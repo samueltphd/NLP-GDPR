@@ -1,4 +1,10 @@
 import random
+# imports for space complexity
+import sys
+from types import ModuleType, FunctionType
+from gc import get_referents
+
+BLACKLIST = type, ModuleType, FunctionType
 
 # different modes of GDPR compliance
 NO_COMPLIANCE, NEUTRAL, STRONG, STRICT = 0, 1, 2, 3
@@ -25,7 +31,7 @@ class Log:
         self.rid_to_global_checkpoints = {} # this is to save the checkpoints after the training algorithm
         # the last variable for stuff
         self.next_rid = 0
-
+       
 
     ############## FUNCTIONS TO USE TO CALCULATE THINGS FOR THE WEIGHT UPDATES ##################
     def weights_given_rid_excluding_uids(self, rid, excluding_uids=[]):
@@ -127,3 +133,33 @@ class Log:
         # return a {uid (int): user (User)} dict
         random_ids = random.sample(self.uid_to_user.keys(), min(num_selecting_users, len(self.uid_to_user.keys())))
         return {k: self.uid_to_user[k] for k in random_ids}
+
+
+    def getsize(self):
+        def getsize_atomic(obj):
+            """
+            sum size of object & members - 
+            https://stackoverflow.com/questions/449560/how-do-i-determine-the-size-of-an-object-in-python
+            """
+            if isinstance(obj, BLACKLIST):
+                raise TypeError('getsize() does not take argument of type: ' + str(type(obj)))
+            seen_ids = set()
+            size = 0
+            objects = [obj]
+            while objects:
+                need_referents = []
+                for obj in objects:
+                    if not isinstance(obj, BLACKLIST) and id(obj) not in seen_ids:
+                        seen_ids.add(id(obj))
+                        size += sys.getsizeof(obj)
+                        need_referents.append(obj)
+                objects = get_referents(*need_referents)
+            return size
+        total_size = 0
+        for i in self.__dict__.values():
+            try:
+                total_size += getsize_atomic(i)
+            except Exception as e:
+                print("Exception caught at getsize() in logger.py: ", e)
+                continue
+        return total_size    
