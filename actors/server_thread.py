@@ -112,4 +112,6 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
 
         rid += 1
 
+    log.save_logger_model("mnist-logger.pkl")
+
     return statistics

@@ -32,7 +32,7 @@ class Log(object):
         self.rid_to_global_checkpoints = {} # this is to save the checkpoints after the training algorithm
         # the last variable for stuff
         self.next_rid = 0
-       
+
 
     ############## FUNCTIONS TO USE TO CALCULATE THINGS FOR THE WEIGHT UPDATES ##################
     def weights_given_rid_excluding_uids(self, rid, excluding_uids=[]):
@@ -139,7 +139,7 @@ class Log(object):
     def getsize(self):
         def getsize_atomic(obj):
             """
-            sum size of object & members - 
+            sum size of object & members -
             https://stackoverflow.com/questions/449560/how-do-i-determine-the-size-of-an-object-in-python
             """
             if isinstance(obj, BLACKLIST):
@@ -167,5 +167,5 @@ class Log(object):
 
 
     def save_logger_model(self, address):
-        with open(address, wb) as output:
+        with open(address, "wb") as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)

@@ -9,7 +9,7 @@ DELETE, UPDATE = "DELETE", "UPDATE"
 class User:
     def __init__(self, uid, aggregator, logger, compliance_mode=NO_COMPLIANCE):
         self.uid = uid # user id
-        self.aggregator = aggregator # aggregator that this user communicates with
+        # self.aggregator = aggregator # aggregator that this user communicates with
         self.logger = logger # logger stores uid to the list of rids they participated in and the range of data they participated in
         # keep track of the data from the user, kept as a list of anything
         self.data = [] # opt_our boolean has to be included in each element - i.e. [{opt_out: Tru, val: "This is a text sent by Nam"}]
@@ -109,14 +109,8 @@ class User:
             self.uncommitted_delete = list(set(self.uncommitted_delete))
 
 
-    def request_aggregator_update(self):
-        # from the uncommitted, get the relevant round ids
-        # self.aggregator.user_request_update(self.uid, self.uncommitted_delete, request_type=DELETE)
-        # self.uncommitted_delete = []
-        # # and then after the aggregator has successfully done this, we'll clear uncommitted
-        # self.aggregator.user_request_update(self.uid, self.uncommitted_update, request_type=UPDATE)
-        # self.uncommitted_update = []
-        self.aggregator.urm.add_request([(True, self.uid, v) for v in self.uncommitted_delete])
+    def request_aggregator_update(self, aggregator):
+        aggregator.urm.add_request([(True, self.uid, v) for v in self.uncommitted_delete])
 
 
 
