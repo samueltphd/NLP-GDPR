@@ -164,14 +164,13 @@ def main():
 
     results = run()
 
-    f = open("-".join(sys.argv[2:]) + ".csv", "w")
-    f.write("round,guesses,correct," + ",".join([",".join([str(x) + "-to-" + str(y) for y in range(10)]) for x in range(10)]) + '\n')
+    f = open("income_" + "-".join(sys.argv[2:]) + ".csv", "w")
+    f.write("round,time,space,requests_handled,guesses,correct,true-to-true,true-to-false,false-to-true,false-to-false\n")
 
     for test in results:
         for r in test:
-            tokens = ','.join([','.join([str(x) for x in r['guess_to_actual'][str(i)]]) for i in range(10)])
-            f.write(str(r['round']) + ',' + str(r['guesses']) + ',' + str(r['correct']) + ',' + tokens + '\n')
-
+            tokens = ','.join([r['guess_to_actual']["True"][0], r['guess_to_actual']["True"][1], r['guess_to_actual']["False"][0], r['guess_to_actual']["False"][1]])
+            f.write(str(r['round']) + ',' + str(r['time']) + ',' + str(r['logger_size']) + ',' + str(r['requests_handled']) + ',' + str(r['guesses']) + ',' + str(r['correct']) + ',' + tokens + '\n')
     f.close()
 
     print("Test complete. Exiting.")

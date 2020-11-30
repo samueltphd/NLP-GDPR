@@ -25,6 +25,7 @@ def user_thread(obj, agg, log, train_q, weight_q, stop_q, data_reserves, delete_
             # determine any requests to be made
             # if so send request to aggregator to update logger
             count = 0
+
             for _ in range(100):
                 r = random.randrange(100)
                 i = random.randrange(len(obj.data))

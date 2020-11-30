@@ -67,10 +67,13 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
         if not aggregator.basic_train(new_round, train_qs, weight_qs, TRAIN_TIME):
             continue
 
+        print("[server thread] handling user update requests...")
+        handled = aggregator.urm.handle_requests()
+
         print("[server thread] computing accuracy on most recent global weights")
 
-        # round_stats = {"guesses": 0, "correct": 0, "guess_to_actual":{str(i): [0 for _ in range(10)] for i in range(10)}}
-        # round_stats["round"] = rid
+        round_stats = {"guesses": 0, "correct": 0, "guess_to_actual":{"True": [0, 0], "False": [0, 0]}}
+        round_stats["round"] = rid
 
         indices = random.sample(list(range(len(xtest))), len(xtest) // 4)
 
@@ -84,9 +87,24 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
         prediction_loss = loss(samples, labels, model_weights)
         print("Loss: ", prediction_loss, ", at round: ", rid)
 
+        predictions = np.dot(samples, model_weights)
+        softmaxed = softmax(predictions)
+        prediction_labels = np.array([1.0 if e > 0.5 else 0.0 for e in softmaxed])
 
-        print("[server thread] handling user update requests...")
-        aggregator.urm.handle_requests()
+
+        for pred, act in zip(prediction_labels, labels):
+            round_stats["guesses"] += 1
+            round_stats["correct"] += 1 if pred == act else 0
+            round_stats["guess_to_actual"]["True" if pred == act else "False"][min(1, int(act))] += 1
+
+        round_stats['time'] = time.time() - start
+
+        if handled:
+            round_stats['requests_handled'] = 1
+        else:
+            round_stats['requests_handled'] = 0
+
+        round_stats['logger_size'] = log.getsize()
 
         rid += 1
 
