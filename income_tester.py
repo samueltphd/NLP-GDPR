@@ -169,7 +169,7 @@ def main():
 
     for test in results:
         for r in test:
-            tokens = ','.join([r['guess_to_actual']["True"][0], r['guess_to_actual']["True"][1], r['guess_to_actual']["False"][0], r['guess_to_actual']["False"][1]])
+            tokens = ','.join([str(r['guess_to_actual']["True"][0]), str(r['guess_to_actual']["True"][1]), str(r['guess_to_actual']["False"][0]), str(r['guess_to_actual']["False"][1])])
             f.write(str(r['round']) + ',' + str(r['time']) + ',' + str(r['logger_size']) + ',' + str(r['requests_handled']) + ',' + str(r['guesses']) + ',' + str(r['correct']) + ',' + tokens + '\n')
     f.close()
 

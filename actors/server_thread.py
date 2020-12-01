@@ -53,64 +53,69 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
 
     rid = 0
     for _ in range(len(users)):
-        print("[server thread] Starting round " + str(rid) + " at time: " + str(time.time() - start))
-        # determine number of users to participate in the next round
-        r = random.randrange(1, len(users) + 1)
+        while True:
+            try:
+                print("[server thread] Starting round " + str(rid) + " at time: " + str(time.time() - start))
+                # determine number of users to participate in the next round
+                r = random.randrange(1, len(users) + 1)
 
-        # set up the round
-        new_round = Round(
-            rid,                    # round id
-            tfunc,                  # training function
-            dfunc,                  # data function
-            afunc,                  # aggregator function
-            r                       # number of participating devices
-        )
+                # set up the round
+                new_round = Round(
+                    rid,                    # round id
+                    tfunc,                  # training function
+                    dfunc,                  # data function
+                    afunc,                  # aggregator function
+                    r                       # number of participating devices
+                )
 
-        # tell aggregator to make users train on data
-        print("[server thread] calling on users to train...")
-        if not aggregator.basic_train(new_round, train_qs, weight_qs, TRAIN_TIME):
-            continue
+                # tell aggregator to make users train on data
+                print("[server thread] calling on users to train...")
+                if not aggregator.basic_train(new_round, train_qs, weight_qs, TRAIN_TIME):
+                    continue
 
-        print("[server thread] handling user update requests...")
-        handled = aggregator.urm.handle_requests()
+                print("[server thread] handling user update requests...")
+                handled = aggregator.urm.handle_requests()
 
-        print("[server thread] computing accuracy on most recent global weights")
+                print("[server thread] computing accuracy on most recent global weights")
 
-        round_stats = {"guesses": 0, "correct": 0, "guess_to_actual":{str(i): [0 for _ in range(10)] for i in range(10)}}
-        round_stats["round"] = rid
+                round_stats = {"guesses": 0, "correct": 0, "guess_to_actual":{str(i): [0 for _ in range(10)] for i in range(10)}}
+                round_stats["round"] = rid
 
-        indices = random.sample(list(range(len(xtest))), len(xtest) // 4)
+                indices = random.sample(list(range(len(xtest))), len(xtest) // 4)
 
-        images, labels = [], []
-        for i in indices:
-            images.append([xtest[i]])
-            labels.append(ytest[i])
-        images, labels = torch.tensor(images).float(), torch.tensor(labels)
-        model = log.get_global_checkpoint(rid)
-        predictions_probs = model(images)
-        print("[server thread] Finished predicting, now calculating the actual value")
-        prediction = [k.tolist().index(max(k)) for k in predictions_probs]
-        loss_f = nn.CrossEntropyLoss()
-        loss = loss_f(predictions_probs, labels).item()
+                images, labels = [], []
+                for i in indices:
+                    images.append([xtest[i]])
+                    labels.append(ytest[i])
+                images, labels = torch.tensor(images).float(), torch.tensor(labels)
+                model = log.get_global_checkpoint(rid)
+                predictions_probs = model(images)
+                print("[server thread] Finished predicting, now calculating the actual value")
+                prediction = [k.tolist().index(max(k)) for k in predictions_probs]
+                loss_f = nn.CrossEntropyLoss()
+                loss = loss_f(predictions_probs, labels).item()
 
-        for pred, act in zip(prediction, labels):
-            round_stats["guesses"] += 1
-            round_stats["correct"] += 1 if pred == act else 0
-            round_stats["guess_to_actual"][str(pred)][act] += 1
+                for pred, act in zip(prediction, labels):
+                    round_stats["guesses"] += 1
+                    round_stats["correct"] += 1 if pred == act else 0
+                    round_stats["guess_to_actual"][str(pred)][act] += 1
 
-        round_stats['time'] = time.time() - start
+                round_stats['time'] = time.time() - start
 
-        if handled:
-            round_stats['requests_handled'] = 1
-        else:
-            round_stats['requests_handled'] = 0
+                if handled:
+                    round_stats['requests_handled'] = 1
+                else:
+                    round_stats['requests_handled'] = 0
 
-        round_stats['logger_size'] = log.getsize()
+                round_stats['logger_size'] = log.getsize()
 
-        print("Round stats: ", round_stats)
-        statistics.append(round_stats)
+                print("Round stats: ", round_stats)
+                statistics.append(round_stats)
 
-        rid += 1
+                rid += 1
+                break
+            except Exception:
+                continue
 
     log.save_logger_model("mnist-logger.pkl")
 

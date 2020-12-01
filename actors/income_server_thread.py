@@ -49,64 +49,72 @@ def server_thread(aggregator, log, users, train_qs, weight_qs, statistics, xtest
 
     rid = 0
     for _ in range(len(users)):
-        print("[server thread] Starting round " + str(rid) + " at time: " + str(time.time() - start))
-        # determine number of users to participate in the next round
-        r = random.randrange(1, len(users) + 1)
+        while True:
+            try:
+                print("[server thread] Starting round " + str(rid) + " at time: " + str(time.time() - start))
+                # determine number of users to participate in the next round
+                r = random.randrange(1, len(users) + 1)
 
-        # set up the round
-        new_round = Round(
-            rid,                    # round id
-            tfunc,                  # training function
-            dfunc,                  # data function
-            afunc,                  # aggregator function
-            r                       # number of participating devices
-        )
+                # set up the round
+                new_round = Round(
+                    rid,                    # round id
+                    tfunc,                  # training function
+                    dfunc,                  # data function
+                    afunc,                  # aggregator function
+                    r                       # number of participating devices
+                )
 
-        # tell aggregator to make users train on data
-        print("[server thread] calling on users to train...")
-        if not aggregator.basic_train(new_round, train_qs, weight_qs, TRAIN_TIME):
-            continue
+                # tell aggregator to make users train on data
+                print("[server thread] calling on users to train...")
+                if not aggregator.basic_train(new_round, train_qs, weight_qs, TRAIN_TIME):
+                    continue
 
-        print("[server thread] handling user update requests...")
-        handled = aggregator.urm.handle_requests()
+                print("[server thread] handling user update requests...")
+                handled = aggregator.urm.handle_requests()
 
-        print("[server thread] computing accuracy on most recent global weights")
+                print("[server thread] computing accuracy on most recent global weights")
 
-        round_stats = {"guesses": 0, "correct": 0, "guess_to_actual":{"True": [0, 0], "False": [0, 0]}}
-        round_stats["round"] = rid
+                round_stats = {"guesses": 0, "correct": 0, "guess_to_actual":{"True": [0, 0], "False": [0, 0]}}
+                round_stats["round"] = rid
 
-        indices = random.sample(list(range(len(xtest))), len(xtest) // 4)
+                indices = random.sample(list(range(len(xtest))), len(xtest) // 4)
 
-        samples, labels = [], []
-        for i in indices:
-            samples.append(xtest[i])
-            labels.append(ytest[i])
-        samples, labels = np.array(samples).astype(float), np.array(labels)
-        model_weights = log.get_global_checkpoint(rid)
-        # and then this part is to create a dummy LocalUpdate
-        prediction_loss = loss(samples, labels, model_weights)
-        print("Loss: ", prediction_loss, ", at round: ", rid)
+                samples, labels = [], []
+                for i in indices:
+                    samples.append(xtest[i])
+                    labels.append(ytest[i])
+                samples, labels = np.array(samples).astype(float), np.array(labels)
+                model_weights = log.get_global_checkpoint(rid)
+                # and then this part is to create a dummy LocalUpdate
+                prediction_loss = loss(samples, labels, model_weights)
+                print("Loss: ", prediction_loss, ", at round: ", rid)
 
-        predictions = np.dot(samples, model_weights)
-        softmaxed = softmax(predictions)
-        prediction_labels = np.array([1.0 if e > 0.5 else 0.0 for e in softmaxed])
+                predictions = np.dot(samples, model_weights)
+                softmaxed = softmax(predictions)
+                prediction_labels = np.array([1.0 if e > 0.5 else 0.0 for e in softmaxed])
 
 
-        for pred, act in zip(prediction_labels, labels):
-            round_stats["guesses"] += 1
-            round_stats["correct"] += 1 if pred == act else 0
-            round_stats["guess_to_actual"]["True" if pred == act else "False"][min(1, int(act))] += 1
+                for pred, act in zip(prediction_labels, labels):
+                    round_stats["guesses"] += 1
+                    round_stats["correct"] += 1 if pred == min(act, 1.) else 0
+                    round_stats["guess_to_actual"]["True" if pred == min(act, 1.) else "False"][min(1, int(act))] += 1
 
-        round_stats['time'] = time.time() - start
+                round_stats['time'] = time.time() - start
 
-        if handled:
-            round_stats['requests_handled'] = 1
-        else:
-            round_stats['requests_handled'] = 0
+                if handled:
+                    round_stats['requests_handled'] = 1
+                else:
+                    round_stats['requests_handled'] = 0
 
-        round_stats['logger_size'] = log.getsize()
+                round_stats['logger_size'] = log.getsize()
 
-        rid += 1
+                print("Round stats: ", round_stats)
+                statistics.append(round_stats)
+
+                rid += 1
+                break
+            except Exception:
+                continue
 
     log.save_logger_model("income-logger.pkl")
 

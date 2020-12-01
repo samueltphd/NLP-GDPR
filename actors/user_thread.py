@@ -15,10 +15,16 @@ def user_thread(obj, agg, log, train_q, weight_q, stop_q, data_reserves, delete_
         if trequest is not None:
             print("[user thread " + str(obj.uid) + "] starting to train")
 
-            # call the training function with the appropriate global weights
-            # and the appropriate round information
-            result = trequest[0](trequest[1], trequest[2])
-            print("[user thread " + str(obj.uid) + "] training complete")
+            try:
+                # call the training function with the appropriate global weights
+                # and the appropriate round information
+                result = trequest[0](trequest[1], trequest[2])
+                print("[user thread " + str(obj.uid) + "] training complete")
+
+            except ValueError:
+                result = trequest[2]
+                print("[user thread " + str(obj.uid) + "] training error... passing back prior global weights")
+
             # send the results back to the aggregator
             weight_q.enque(result)
 
