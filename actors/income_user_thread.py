@@ -1,5 +1,6 @@
 import random
 import time
+import math
 
 def user_thread(obj, agg, log, train_q, weight_q, stop_q, data_reserves, delete_pct, update_pct):
     start = time.time()
@@ -22,7 +23,7 @@ def user_thread(obj, agg, log, train_q, weight_q, stop_q, data_reserves, delete_
                 print("[user thread " + str(obj.uid) + "] training complete")
 
             except ValueError:
-                result = trequest[2]
+                result = trequest[2], math.inf
                 print("[user thread " + str(obj.uid) + "] training error... passing back prior global weights")
 
             # send the results back to the aggregator
