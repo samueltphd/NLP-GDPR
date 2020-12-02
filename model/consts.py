@@ -5,7 +5,7 @@ MNIST = {
     'num_users': 100,
     'frac': 0.1,
     'local_ep': 5,
-    'local_bs': 10,
+    'local_bs': 200,
     'bs': 128,
     'lr': 0.01,
     'momentum': 0.5,
