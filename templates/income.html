@@ -1,0 +1,27 @@
+<!-- Takes in a user -->
+{% extends "layout.html" %}
+{% block content %}
+<div data-id="{{ user.uid }}">
+    <h3>User ID: {{ user.uid }}</h3>
+    <!-- This part is to display metadata about the user -->
+    <ul>
+        <li><b>Number of rounds participated:</b> {{aggregatedUserInfo['num_rounds_participated']}}</li>
+        <li><b>Number of datapoints:</b> {{aggregatedUserInfo['num_datapoints']}}</li>
+        <li><b>Number of datapoints opted in:</b> {{aggregatedUserInfo['num_optedin_datapoints']}}</li>
+        {% if complianceMode == "STRONG" %}
+        <li><b>Uncommitted delete:</b> {{aggregatedUserInfo['num_uncommitted_delete']}}</li>
+        {% endif %}
+    </ul>
+    <!-- This part is to visualize the data that the user has -->
+    <h3>Data:</h3>
+    <div class="income-data-list slider">
+    {% if user.data == [] %}
+    <p>User does not have any data</p>
+    {% else %}
+    {% for data in user.data %}
+        {% include "miniincome.html" %}
+    {% endfor %}
+    {% endif %}
+    </div>
+</div>
+{% endblock %}

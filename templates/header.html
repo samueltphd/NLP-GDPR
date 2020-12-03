@@ -1,0 +1,39 @@
+<nav class='navbar navbar-expand-lg fixed-top'>
+    <div class='navbar-toggle'>
+      <ul class='navbar-nav mr-auto'>
+        <li class='nav-item'>
+          <a class='nav-link' href="/">Home</a>
+        </li>
+        <!-- To view specific information about MNIST (per user) -->
+        <li class='nav-item'>
+          <a class='nav-link' href="/mnist/{{user.uid}}">MNIST</a>
+        </li>
+        <!-- To view specific information about Income -->
+        <li class='nav-item'>
+          <a class='nav-link' href='/income/{{user.uid}}'>Income</a>
+        </li>
+        <!-- To display information from the Aggregator (how many things have been queued up to request change) -->
+        <li class='nav-item'>
+            <a class='nav-link' href='/server'>Server</a>
+          </li>
+        <!-- To select the user -->
+        <li class='nav-item'>
+          <select name="uid-selector" method="GET" action="/changeUserId">
+            <option value="User: {{user.uid}}" selected>User: {{user.uid}}</option>
+            {% for uid in uids %}
+            <option value="User: {{uid}}">User: {{uid}}</option>
+            {% endfor %}
+        </select>
+        </li>
+        <!-- To select compliance mode  -->
+        <li class='nav-item'>
+          <select name="compliance-selector" method="GET" action="/changeComplianceMode">
+            <option value="Compliance: {{complianceMode}}" selected>Compliance: {{complianceMode}}</option>
+            {% for complianceOption in complianceOptions %}
+            <option value="Compliance: {{complianceOption}}">Compliance: {{complianceOption}}</option>
+            {% endfor %}
+        </select>
+        </li>
+      </ul>
+    </div>
+  </nav>

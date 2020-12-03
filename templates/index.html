@@ -1,0 +1,42 @@
+<!-- Takes in a logger for mnist and a logger for income -->
+{% extends "layout.html" %}
+{% block content %}
+<div id="income-overview">
+    <h3>Income SGD</h3>
+    {% if not incomelogger %}
+    <p>Income logger not available. Sorry about that!</p>
+    {% else %}
+    <ul id="income-logger-data-displayer">
+        {% if incomeAggregated %}
+        <li><b>Number of users participated: </b>{{incomeAggregated['num_users_participated']}}</li>
+        <li><b>Number of rounds:</b> {{incomeAggregated['num_rounds']}}</li>
+        <li><b>(Min, max, average) rounds participated per user:</b> {{incomeAggregated['min_num_rounds_participated_per_user']}}, {{incomeAggregated['max_num_rounds_participated_per_user']}}, {{incomeAggregated['average_num_rounds_partipated_per_user']}}</li>
+        <li><b>(Min, max, average) data points per user:</b> {{incomeAggregated['min_num_datapoints_per_user']}}, {{incomeAggregated['max_num_datapoints_per_user']}}, {{incomeAggregated['average_num_datapoints_per_user']}}</li>
+        <li><b>(Min, max, average) currently opted in datapoints per user:</b> {{incomeAggregated['min_num_datapoints_optedin_per_user']}}, {{incomeAggregated['max_num_datapoints_optedin_per_user']}}, {{incomeAggregated['average_datapoints_optedin_per_user']}}</li>
+        <li><b>(Min, max, average) current number of users per round:</b>{{incomeAggregated['min_num_users_per_round']}}, {{incomeAggregated['max_num_users_per_round']}}, {{incomeAggregated['average_num_users_per_round']}}</li>
+        {% else %}
+        <li>Ruh roh</li>
+        {% endif %}
+    </ul>
+    {% endif %}
+</div>
+<br>
+<div id="mnist-overview">
+    <h3>MNIST</h3>
+    {% if not mnistlogger %}
+    <p>MNIST logger not available. Sorry about that!</p>
+    {% else %}
+    <p>MNIST information goes here</p>
+    {% endif %}
+</div>
+<br>
+<div id="instructions">
+    <h3>Compliance modes</h3>
+    <ul>
+        <li>NO_COMPLIANCE: Not allowing users to delete/update data participated in training rounds at all</li>
+        <li>NEUTRAL: Allowing a shallow removal/update of data (does not reflect on the weight contribution to the rounds participated)</li>
+        <li>STRONG: Allowing a deep removal/update of data (that happens every so often - after enough requests are made)</li>
+        <li>STRICT: Allowing an immediate deep removal/update of data</li>
+    </ul>
+</div>
+{% endblock %}

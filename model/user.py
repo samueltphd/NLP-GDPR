@@ -110,6 +110,7 @@ class User:
 
 
     def request_aggregator_update(self, aggregator):
+        aggregator.urm.add_request([(True, self.uid, v) for v in self.uncommitted_update])
         aggregator.urm.add_request([(True, self.uid, v) for v in self.uncommitted_delete])
 
 
