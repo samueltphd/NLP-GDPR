@@ -53,6 +53,7 @@ class Aggregator:
         self.urm = UserRequestManager(self, compliance_mode)
         self.producer_qs = None
         self.consumer_qs = None
+        self.lastMessage = ""
         if compliance_mode == STRONG:
             # data structure to map from id (int) to list of (round, request_type)
             self.to_updates = {}
@@ -67,6 +68,7 @@ class Aggregator:
 
 
     def user_request_update_weak(self, uid: int, rids: list, request_type=DELETE):
+        self.lastMessage = "Received request to weakly update from user: " + str(uid) + " for rounds: " + ", ".join([str(e) for e in rids])
         assert self.compliance_mode == NEUTRAL
         try:
             # What this will do is just call the logger to remove user information in there
@@ -91,13 +93,16 @@ class Aggregator:
                     # update the state
                     self.logger.log_round_participated(uid, rid, output)
                     # dont do anything with local loss since we are not retraining again
+            self.lastMessage = "Finished request to weakly update from user: " + str(uid) + " for rounds: " + ", ".join([str(e) for e in rids])
         except Exception as e:
+            self.lastMessage = "Error when processing request to weakly update from user: " + str(uid) + " for rounds: " + ", ".join([str(e) for e in rids])
             print("Exception caught: ", e)
             return False
         return True
 
 
     def user_request_update_strong(self, uid: int, rids: list, request_type=DELETE):
+        self.lastMessage = "Received request to strongly update from user: " + str(uid) + " for rounds: " + ", ".join([str(e) for e in rids])
         assert self.compliance_mode == STRONG
         try:
             # for each round id
@@ -110,14 +115,17 @@ class Aggregator:
             if len(rid) >= self.badge_limit:
                 self.process_badge_request()
             # if all is done, return True (successful)
+            self.lastMessage = "Finished request to strongly update from user: " + str(uid) + " for rounds: " + ", ".join([str(e) for e in rids])
             return True
         # if somewhere fails, return False
         except Exception as e:
+            self.lastMessage = "Error when processing request to strongly update from user: " + str(uid) + " for rounds: " + ", ".join([str(e) for e in rids])
             return False
 
 
 
     def process_badge_request(self):
+        self.lastMessage = "Received request to process badge request"
         assert self.compliance_mode == STRONG
         to_update_dict = self.get_to_update_dict()
         # temp variables to keep track of the rid -> uids that requested to delete/update
@@ -203,6 +211,7 @@ class Aggregator:
                     self.logger.log_round_participated(uid, rid, new_weights[uid])
             # and then, when we are done with everything, we will empty self.to_updates
             self.clear_to_update_dict()
+            self.lastMessage = "Finished processing request to process delete/update requests"
         except Exception as e:
             print("Exception caught: ", e)
             return False
@@ -211,6 +220,7 @@ class Aggregator:
 
 
     def user_request_update_strict(self, uid: int, rids: list, request_type=DELETE):
+        self.lastMessage = "Received request to strictly update from user: " + str(uid) + " for rounds: " + ", ".join([str(e) for e in rids])
         assert self.compliance_mode == STRICT
         try:
             # get the user
@@ -255,7 +265,9 @@ class Aggregator:
                 self.logger.set_global_checkpoint(rid, updated_weights, replace=True)
                 # and then update this uid's participation in the logger
                 self.logger.log_round_participated(uid, rid, output)
+                self.lastMessage = "Finished request to strictly update from user: " + str(uid) + " for rounds: " + ", ".join([str(e) for e in rids])
         except Exception as e:
+            self.lastMessage = "Error when processing request to strictly update from user: " + str(uid) + " for rounds: " + ", ".join([str(e) for e in rids])
             print("Exception caught in user_request_update_strong: ", e)
             return False
         return True
@@ -276,6 +288,7 @@ class Aggregator:
         - Select randomly num_participants users to train stuff
         - For each of these, call the train() function on each user's device
         """
+        self.lastMessage = "Receive the request to do basic train for round: " + str(t_round.rid)
         self.producer_qs = producer_qs
         self.consumer_qs = consumer_qs
         # get the training function and the data selection function for each user
@@ -332,7 +345,9 @@ class Aggregator:
                 # and then, got hrough each user to update their weight contribution in this round
                 for uid in weights_returned:
                     self.logger.log_round_participated(uid, rid, weights_returned[uid])
+            self.lastMessage = "Finished the request to do basic train for round: " + str(t_round.rid)
             return True
         except Exception as e:
+            self.lastMessage = "Error received when performing request to do basic train for round: " + str(t_round.rid)
             print("Exception caught: ", e)
             return False

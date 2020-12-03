@@ -3,12 +3,12 @@
         <div id="{{user.uid}} - {{ data['id'] }}" style="background-color: #e0f0ce; height:20%; width: 20%; margin:5px;padding:5px;">
             <p>[IN]: {{ data['id'] }}</p>
             <p>Rounds*: {{user.data_id_to_rids[data['id']]}}</p>
-            <a href="/change_permission/user.uid/data['id']">Opt out</a>
+            <a href="/change_permission/{{user.uid}}/{{data['id']}}">Opt out</a>
         </div>
     {% else %}
         <div id="{{user.uid}} - {{ data['id'] }}" style="background-color: #c7c7c7; height:20%; width: 20%; margin:5px;padding:5px;">
             [OUT]: {{ data['id'] }}
-            <a href="/change_permission/user.uid/data['id']">Opt in</a>
+            <a href="/change_permission/{{user.uid}}/{{data['id']}}">Opt in</a>
         </div>
     {% endif %}
 </a>

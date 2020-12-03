@@ -1,4 +1,4 @@
-from flask import render_template, Flask
+from flask import render_template, redirect, Flask
 import sys
 import pickle
 import random
@@ -62,12 +62,19 @@ def income_user_view(uid):
 
 
 @app.route("/change_permission/<user_id>/<data_id>")
-def change_data_permission(uid, data_id):
+def change_data_permission(user_id, data_id):
     """
     function to toggle the data permission
     """
-    uid, data_id = int(uid), int(data_id)
-    pass
+    uid, data_id = int(user_id), int(data_id)
+    user = income_logger.uid_to_user[uid]
+    datapoints = user.data
+    for point in datapoints:
+        if int(point['id']) != data_id: continue
+        user.change_data_permission(data_id, value=not(point['opt_in']), deep=current_compliance_mode >= 2)
+    aggregated_info = get_aggregated_info_about_user(user, income_logger)
+    return render_template("income.html", user=user, aggregatedUserInfo=aggregated_info,
+    complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())), complianceOptions=list(COMPLIANCE_MODE_DICT.keys()))
 
 
 @app.route("/server")
@@ -77,8 +84,10 @@ def display_server():
     """
     return render_template("server.html", server=income_aggregator, incomeLogger=income_logger, user=income_logger.get_user(current_uid),
     complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())),
-    complianceOptions=list(COMPLIANCE_MODE_DICT.keys()))
+    complianceOptions=list(COMPLIANCE_MODE_DICT.keys()), queueLen=len(income_aggregator.urm.values))
     
+
+
 
 
 ########################### We temporarily don't care about these ########################

@@ -1,13 +1,27 @@
 {% extends "layout.html" %}
 {% block content %}
-<div id="aggregtor-div">
-    <h3>Aggregator</h3>
-    <ul>
-        {% if complianceMode == "STRONG" %}
-        <li></li>
-        {% endif %}
-    </ul>
-    {% endif %}
+<div>
+    <div id="aggregtor-div">
+        <h3>Aggregator</h3>
+        <ul>
+            <li><b>Queue of requests:</b> {{queueLen}}</li>
+            <li><b>Compliance mode:</b> {{complianceOptions[server.compliance_mode]}}</li>
+            <li><b>Last message from server:</b> {{server.lastMessage}}</li>
+        </ul>
+    </div>
+    <br>
+    </div>
+    <div id="logger">
+        <h3>Logger</h3>
+        <p>Information that I carry: </p>
+        <ul>
+            <li>Mapping from User IDs -> Rounds</li>
+            <li>Mapping from Rounds -> User IDs</li>
+            <li>The weight contribution of users in each round</li>
+            <li>User IDs</li>
+            <li>All the round information (data function, train function, aggregation function) </li>
+            <li>The weights across different rounds we've gone through</li>
+        </ul>
+    </div>
 </div>
-<div id="aggregator"
 {% endblock %}
