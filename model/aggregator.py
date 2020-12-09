@@ -54,10 +54,10 @@ class Aggregator:
         self.producer_qs = None
         self.consumer_qs = None
         self.lastMessage = ""
-        if compliance_mode == STRONG:
-            # data structure to map from id (int) to list of (round, request_type)
-            self.to_updates = {}
-            self.badge_limit = badge_limit
+        # data structure to map from id (int) to list of (round, request_type)
+        self.to_updates = {}
+        self.badge_limit = badge_limit
+            
 
 
     def get_to_update_dict(self):

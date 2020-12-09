@@ -112,6 +112,8 @@ class User:
     def request_aggregator_update(self, aggregator):
         aggregator.urm.add_request([(True, self.uid, v) for v in self.uncommitted_update])
         aggregator.urm.add_request([(True, self.uid, v) for v in self.uncommitted_delete])
+        self.uncommitted_delete = []
+        self.uncommitted_update = []
 
 
 
@@ -139,6 +141,17 @@ class User:
         output, localLoss = train_f(training_data, global_weights)
         # # ask the logger to log the round id
         # self.logger.log_round_participated(uid, rid, output) -- this should probably happen at the aggregator level
+        # TODO: Ask the user to log that these pieces of data participated in the training
+        for datapoint in training_data:
+            d_id = datapoint["id"]
+            # associate did -> rid
+            if d_id not in self.data_id_to_rids: self.data_id_to_rids[d_id] = []
+            self.data_id_to_rids[d_id].append(rid)
+            # associate rid -> did
+            if rid not in self.rid_to_data_ids: self.rid_to_data_ids[rid] = []
+            self.rid_to_data_ids[rid].append(d_id)
+            # adding this data id
+
         # return the data so the aggregator can get it
         return output, localLoss
 

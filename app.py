@@ -1,4 +1,4 @@
-from flask import render_template, redirect, Flask
+from flask import render_template, redirect, request, Flask
 import sys
 import pickle
 import random
@@ -24,6 +24,10 @@ def randomly_optin_data(uid_to_user_dict):
 INCOME_PICKLE_PATH = "income-logger.pkl"
 with open(INCOME_PICKLE_PATH, "rb") as pickle_file:
     income_logger = pickle.load(pickle_file)
+    for uid in income_logger.uid_to_user:
+        user = income_logger.uid_to_user[uid]
+        user.uncommitted_delete = []
+        user.uncommitted_update = []
 
 # randomly opt in data
 randomly_optin_data(income_logger.uid_to_user)
@@ -44,6 +48,8 @@ current_uid = 0
 @app.route("/")
 def home():
     income_aggregated_info_dict = get_aggregated_information_about_logger(income_logger)
+    print("Global compliance mode str: ", current_compliance_mode_str)
+    print("Global compliance mode: ", current_compliance_mode)
     return render_template("index.html", incomelogger=income_logger, mnistlogger=None, user=income_logger.get_user(current_uid),
     complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())), complianceOptions=list(COMPLIANCE_MODE_DICT.keys()),
     incomeAggregated=income_aggregated_info_dict)
@@ -77,17 +83,110 @@ def change_data_permission(user_id, data_id):
     complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())), complianceOptions=list(COMPLIANCE_MODE_DICT.keys()))
 
 
+@app.route("/delete_data_local/<user_id>/<data_id>")
+def perform_local_delete(user_id, data_id):
+    uid, data_id = int(user_id), int(data_id)
+    user = income_logger.uid_to_user[uid]
+    user.remove_data(data_id, deep=False)
+    aggregated_info = get_aggregated_info_about_user(user, income_logger)
+    return render_template("income.html", user=user, aggregatedUserInfo=aggregated_info,
+    complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())), complianceOptions=list(COMPLIANCE_MODE_DICT.keys()))
+
+
+@app.route("/delete_data_deep/<user_id>/<data_id>")
+def perform_deep_delete(user_id, data_id):
+    uid, data_id = int(user_id), int(data_id)
+    user = income_logger.uid_to_user[uid]
+    user.remove_data(data_id, deep=True)
+    aggregated_info = get_aggregated_info_about_user(user, income_logger)
+    return render_template("income.html", user=user, aggregatedUserInfo=aggregated_info,
+    complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())), complianceOptions=list(COMPLIANCE_MODE_DICT.keys()))
+    
+
+@app.route("/update_data_local/<user_id>/<data_id>")
+def perform_local_update(user_id, data_id):
+    uid, data_id = int(user_id), int(data_id)
+    user = income_logger.uid_to_user[uid]
+    for d in user.data:
+        if d["id"] == data_id:
+            new_data = d.copy()
+    user.update_data(data_id, new_data, deep=False)
+    aggregated_info = get_aggregated_info_about_user(user, income_logger)
+    return render_template("income.html", user=user, aggregatedUserInfo=aggregated_info,
+    complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())), complianceOptions=list(COMPLIANCE_MODE_DICT.keys()))
+
+
+@app.route("/commit_deletes_and_updates/<user_id>")
+def commit_deletes_and_updates(user_id):
+    uid = int(user_id)
+    user = income_logger.uid_to_user[uid]
+    user.request_aggregator_update(income_aggregator)
+    aggregated_info = get_aggregated_info_about_user(user, income_logger)
+    return render_template("income.html", user=user, aggregatedUserInfo=aggregated_info,
+    complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())), complianceOptions=list(COMPLIANCE_MODE_DICT.keys()))
+
+
+@app.route("/update_data_deep/<user_id>/<data_id>")
+def perform_deep_update(user_id, data_id):
+    uid, data_id = int(user_id), int(data_id)
+    user = income_logger.uid_to_user[uid]
+    for d in user.data:
+        if d["id"] == data_id:
+            new_data = d.copy()
+    user.update_data(data_id, new_data, deep=True)
+    aggregated_info = get_aggregated_info_about_user(user, income_logger)
+    return render_template("income.html", user=user, aggregatedUserInfo=aggregated_info,
+    complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())), complianceOptions=list(COMPLIANCE_MODE_DICT.keys()))
+
+
+def get_current_compliance_mode_str():
+    return current_compliance_mode_str
+
+def get_current_compliance_mode():
+    return current_compliance_mode
+
 @app.route("/server")
 def display_server():
     """
     function to display the server side of things
     """
+    print("Global compliance mode str - /server: ", current_compliance_mode_str)
+    print("Global compliance mode - /server: ", current_compliance_mode)
     return render_template("server.html", server=income_aggregator, incomeLogger=income_logger, user=income_logger.get_user(current_uid),
-    complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())),
+    complianceMode=get_current_compliance_mode_str(), uids=list(sorted(income_logger.uid_to_rids.keys())),
     complianceOptions=list(COMPLIANCE_MODE_DICT.keys()), queueLen=len(income_aggregator.urm.values))
     
 
+@app.route("/changeCompliance", methods=["POST"])
+def changeCompliance():
+    print("Received change compliance request")
+    global current_compliance_mode_str, current_compliance_mode
+    complianceModeStr = request.form['selectedCompliance']
+    current_compliance_mode_str = complianceModeStr
+    current_compliance_mode = COMPLIANCE_MODE_DICT[current_compliance_mode_str]
+    income_aggregator.compliance_mode = COMPLIANCE_MODE_DICT[current_compliance_mode_str]
+    income_aggregated_info_dict = get_aggregated_information_about_logger(income_logger)
+    return redirect("/")
+    # return render_template("index.html", incomelogger=income_logger, mnistlogger=None, user=income_logger.get_user(current_uid),
+    # complianceMode=current_compliance_mode_str, uids=list(sorted(income_logger.uid_to_rids.keys())), complianceOptions=list(COMPLIANCE_MODE_DICT.keys()),
+    # incomeAggregated=income_aggregated_info_dict)
 
+
+@app.route("/changeUid", methods=["POST"])
+def changeUid():
+    global current_uid
+    newUid = int(request.form['uid-selector'])
+    current_uid = newUid
+    income_aggregated_info_dict = get_aggregated_information_about_logger(income_logger)
+    return redirect("/")
+
+
+@app.route("/process_batch_request")
+def process_batch_request():
+    income_aggregator.process_badge_request()
+    return render_template("server.html", server=income_aggregator, incomeLogger=income_logger, user=income_logger.get_user(current_uid),
+    complianceMode=get_current_compliance_mode_str(), uids=list(sorted(income_logger.uid_to_rids.keys())),
+    complianceOptions=list(COMPLIANCE_MODE_DICT.keys()), queueLen=len(income_aggregator.urm.values))
 
 
 ########################### We temporarily don't care about these ########################
@@ -97,15 +196,20 @@ def mnist_user_view(uid):
     Function to display data from a user in the mnist context
     """
     uid = int(uid)
-    pass
+    user = income_logger.uid_to_user[uid]
+    return render_template('mnist.html', user=user)
+    
 
 #################################### HELPER FUNCTIONS ####################################
 def get_aggregated_info_about_user(user, logger):
     stats = {}
     uid = user.uid
     user.data = sorted(user.data, key=lambda x: x['id'])
+    for d in user.data:
+        d["rids"] = list(set(d["rids"]))
     # uncommitted delete
     stats["num_uncommitted_delete"] = len(user.uncommitted_delete)
+    stats["num_uncommitted_update"] = len(user.uncommitted_update)
     # num rounds participated
     stats["num_rounds_participated"] = len(logger.uid_to_rids[uid])
     # num datapoints:
@@ -167,6 +271,18 @@ def get_aggregated_information_about_logger(logger):
     stats["average_num_users_per_round"] = avg_users_per_round
     stats["max_num_users_per_round"] = max_users_per_round
     stats["min_num_users_per_round"] = min_users_per_round
+    # also doing this hacking - to be deleted
+    # for u in logger.uid_to_rids:
+    #     temp_user = logger.uid_to_user[u]
+    #     # rounds participated:
+    #     rids_participated_given_u = logger.uid_to_rids[u]
+    #     num_rounds_participated_per_user = len(rids_participated_given_u)
+    #     # for each datapont, now we're going to update the rounds participated
+    #     for datapoint in temp_u.data:
+    #         # randint number of rounds that this has participated in
+    #         num_rounds_participating_per_datapoint = random.randrange(num_rounds_participated)
+    #         # and then for each rids, 
+            
     # loss_dict = {}
     # loss per each round
     # for r in logger.rid_to_global_checkpoints:

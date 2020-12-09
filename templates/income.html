@@ -9,7 +9,9 @@
         <li><b>Number of datapoints:</b> {{aggregatedUserInfo['num_datapoints']}}</li>
         <li><b>Number of datapoints opted in:</b> {{aggregatedUserInfo['num_optedin_datapoints']}}</li>
         {% if complianceMode == "STRONG" %}
-        <li><b>Uncommitted delete:</b> {{aggregatedUserInfo['num_uncommitted_delete']}}</li>
+        <li><b>Uncommitted deletes (distinct rounds):</b> {{aggregatedUserInfo['num_uncommitted_delete']}}</li>
+        <li><b>Uncommitted updates (distinct rounds):</b> {{aggregatedUserInfo['num_uncommitted_update']}}</li>
+        <li><a href="/commit_deletes_and_updates/{{ user.uid }}">Commit deletes and updates</a></li>
         {% endif %}
     </ul>
     <!-- This part is to visualize the data that the user has -->

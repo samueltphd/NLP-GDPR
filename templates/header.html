@@ -18,21 +18,26 @@
           </li>
         <!-- To select the user -->
         <li class='nav-item'>
-          <select name="uid-selector" method="GET" action="/changeUserId">
-            <option value="User: {{user.uid}}" selected>User: {{user.uid}}</option>
-            {% for uid in uids %}
-            <option value="User: {{uid}}">User: {{uid}}</option>
-            {% endfor %}
-        </select>
+          <form method='post' name='uid_form' action='/changeUid' class='form-inline col-xs-4 my-4 my-lg-0'>
+            <select name="uid-selector" onchange="this.form.submit();">
+              <option value="{{user.uid}}" selected>User: {{user.uid}}</option>
+              {% for uid in uids %}
+              <option value="{{uid}}">User: {{uid}}</option>
+              {% endfor %}
+            </select>
+
+          </form>
         </li>
         <!-- To select compliance mode  -->
         <li class='nav-item'>
-          <select name="compliance-selector" method="GET" action="/changeComplianceMode">
-            <option value="Compliance: {{complianceMode}}" selected>Compliance: {{complianceMode}}</option>
-            {% for complianceOption in complianceOptions %}
-            <option value="Compliance: {{complianceOption}}">Compliance: {{complianceOption}}</option>
-            {% endfor %}
-        </select>
+          <form method='post' name='compliance_form' action='/changeCompliance' class='form-inline col-xs-4 my-4 my-lg-0'>
+            <select id="selectedCompliance" name="selectedCompliance" onchange="this.form.submit();">
+              <option value="{{complianceMode}}" selected>Compliance: {{complianceMode}}</option>
+              {% for complianceOption in complianceOptions %}
+              <option value="{{complianceOption}}">Compliance: {{complianceOption}}</option>
+              {% endfor %}
+            </select>
+          </form>
         </li>
       </ul>
     </div>
